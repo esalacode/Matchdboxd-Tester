@@ -1,4 +1,4 @@
-// Minimal Letterboxd scraper (client‑side only)
+// Minimal Letterboxd scraper (client‑side only) — with multi‑proxy fallback
 const status = document.getElementById('status');
 const list   = document.getElementById('filmList');
 const btn    = document.getElementById('fetchBtn');
@@ -12,24 +12,45 @@ btn.addEventListener('click', () => {
     fetchAllFilms(user);
 });
 
+// Free CORS proxies that still work with Letterboxd
+const CORS_PROXIES = [
+    url => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`,
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://cors.isomorphic-git.org/${url}`
+];
+
+async function fetchViaAnyProxy(url){
+    for(const wrap of CORS_PROXIES){
+        try{
+            const resp = await fetch(wrap(url));
+            if(resp.ok){
+                return await resp.text();
+            }
+        }catch(e){
+            // try next proxy
+        }
+    }
+    throw new Error('All free CORS proxies failed — profile may be private, or Letterboxd is blocking scrapers.');
+}
+
 async function fetchAllFilms(username){
     list.innerHTML = '';
     status.textContent = 'Fetching… (this may take a moment for big collections)';
     const films = new Map();               // "Title (Year)" → year
 
-    const proxy = 'https://api.allorigins.win/raw?url=';
     let page = 1;
     try{
         while(true){
             const path = page === 1
                 ? `https://letterboxd.com/${username}/films/`
                 : `https://letterboxd.com/${username}/films/page/${page}/`;
-            const resp = await fetch(proxy + encodeURIComponent(path));
-            if(!resp.ok) throw new Error('Profile not found or blocked by CORS');
-            const htmlText = await resp.text();
+
+            const htmlText = await fetchViaAnyProxy(path);
             const countThisPage = extractFilms(htmlText, films);
             if(countThisPage === 0) break;   // reached the end
             page++;
+            // avoid hammering the proxy
+            await new Promise(r => setTimeout(r, 350));
         }
 
         if(films.size === 0){
@@ -54,7 +75,7 @@ async function fetchAllFilms(username){
 // Parse one Letterboxd films page HTML and populate Map
 function extractFilms(htmlText, map){
     const doc = new DOMParser().parseFromString(htmlText, 'text/html');
-    const items = doc.querySelectorAll('li.poster-container');
+    const items = doc.querySelectorAll('li.poster-container, li.film-poster');
     let added = 0;
     items.forEach(li => {
         const title = li.getAttribute('data-film-name');
