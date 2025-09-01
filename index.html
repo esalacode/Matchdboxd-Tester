@@ -1,91 +1,26 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Letterboxd → Films (Title + Year)</title>
-  <meta name="description" content="Enter a Letterboxd username to list all films they’ve logged, with release year. Pure static site." />
-  <style>
-    :root { --fg:#111; --bg:#fff; --muted:#666; --accent:#0b5cff; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji","Segoe UI Emoji"; color: var(--fg); background: var(--bg); }
-    header { padding: 24px 16px; border-bottom: 1px solid #eee; }
-    h1 { font-size: 20px; margin: 0 0 8px; }
-    main { max-width: 900px; margin: 0 auto; padding: 16px; }
-    .card { border: 1px solid #eee; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.03); }
-    label { font-weight: 600; font-size: 14px; display:block; margin-bottom:6px; }
-    input[type="text"] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 14px; }
-    .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
-    button { border: 1px solid #ccc; padding: 10px 14px; border-radius: 10px; background: #f7f7f7; cursor: pointer; font-weight: 600; }
-    button.primary { background: var(--accent); color:#fff; border-color: var(--accent); }
-    button:disabled { opacity: .6; cursor: not-allowed; }
-    .muted { color: var(--muted); font-size: 13px; }
-    .spacer { height: 10px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; font-size: 14px; }
-    th { background: #fafafa; position: sticky; top: 0; }
-    #status { margin-top: 8px; min-height: 18px; }
-    .right { margin-left: auto; }
-    details { margin-top: 8px; }
-    code { background: #f5f5f5; padding: 2px 6px; border-radius: 6px; }
-    footer { padding: 24px 16px; color:#777; text-align:center; font-size: 12px;}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Letterboxd Films Watched</title>
+    <style>
+        body{font-family:Arial, sans-serif;max-width:600px;margin:40px auto;padding:0 1rem;line-height:1.4;}
+        h1{font-size:1.5rem;margin-bottom:0.5rem;}
+        input{padding:0.5rem;font-size:1rem;width:65%;}
+        button{padding:0.55rem 1rem;font-size:1rem;margin-left:0.5rem;cursor:pointer;}
+        ul{list-style:none;padding:0;margin-top:1rem;}
+        li{margin:0.25rem 0;}
+        .error{color:#b00;}
+    </style>
 </head>
 <body>
-  <header>
-    <h1>Letterboxd → Films (Title + Year)</h1>
-    <div class="muted">Enter a public Letterboxd username. This runs entirely in your browser.</div>
-  </header>
-
-  <main>
-    <div class="card">
-      <div class="row">
-        <div style="flex: 1 1 260px;">
-          <label for="username">Letterboxd username</label>
-          <input id="username" type="text" placeholder="e.g. davidlynch" autocomplete="username" />
-        </div>
-        <div class="row" style="align-self:flex-end;">
-          <button id="run" class="primary">Fetch films</button>
-          <button id="downloadCsv" disabled>Download CSV</button>
-          <button id="copy" disabled>Copy to clipboard</button>
-        </div>
-      </div>
-      <div id="status" class="muted"></div>
-
-      <details>
-        <summary>Advanced</summary>
-        <div class="spacer"></div>
-        <div class="row">
-          <label for="proxy" class="muted">CORS proxy (optional)</label>
-          <input id="proxy" type="text" placeholder="https://cors.isomorphic-git.org/" />
-          <button id="testProxy">Test proxy</button>
-        </div>
-        <div class="muted">If Letterboxd blocks cross‑origin requests, set a CORS proxy. Default works for most people.</div>
-      </details>
-    </div>
-
-    <div class="spacer"></div>
-
-    <div class="card">
-      <div class="row">
-        <div><strong>Results</strong> <span id="count" class="muted">(0)</span></div>
-        <div class="right muted" id="elapsed"></div>
-      </div>
-      <div class="spacer"></div>
-      <table id="resultsTable" style="display:none;">
-        <thead>
-          <tr><th style="width:70%;">Film</th><th>Year</th></tr>
-        </thead>
-        <tbody id="results"></tbody>
-      </table>
-      <div id="empty" class="muted">No data yet.</div>
-    </div>
-  </main>
-
-  <footer>
-    Built as a tiny static tool (no server). Private profiles won’t work.
-  </footer>
-
-  <script src="./script.js"></script>
+    <h1>Letterboxd Films Watched</h1>
+    <p>Enter a <a href="https://letterboxd.com/" target="_blank" rel="noopener">Letterboxd</a> username to list every film they’ve marked as <em>Watched</em>.</p>
+    <input type="text" id="username" placeholder="Username" autocomplete="off">
+    <button id="fetchBtn">Fetch</button>
+    <p id="status" class="error"></p>
+    <ul id="filmList"></ul>
+    <script src="script.js"></script>
 </body>
 </html>

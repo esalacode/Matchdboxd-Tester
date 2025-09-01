@@ -1,32 +1,20 @@
-# Letterboxd → Films (Title + Year)
+# Minimal Letterboxd Film List Site
 
-Minimal static site: enter a **Letterboxd username** and it lists every film they’ve logged, with the **release year**. No server, no build.
+Static, client‑side site that lists **every** film a Letterboxd user has marked as *Watched* together with its release year.
 
-> ⚠️ **Public profiles only.** Letterboxd doesn’t offer a public API. This reads the public `/films/` pages in your browser via a CORS-friendly proxy.
-
-## Files
-- `index.html` – UI (single page)
-- `script.js` – tiny scraper (client-side)
-  
 ## How it works
-- Fetches paginated pages at `https://letterboxd.com/<username>/films/page/<n>/` via a CORS proxy (default: `https://cors.isomorphic-git.org/`).
-- Parses `data-film-name` and `data-film-release-year` (or `data-film-year`) attributes from poster elements.
-- Deduplicates and sorts by title, then lets you **download CSV** or **copy** the list.
+* Scrapes the public `/films` pages via the free **[AllOrigins](https://allorigins.win/)** CORS proxy—no backend needed.
+* Parses each film’s `data-film-name` and `data-film-release-year` attributes.
+* De‑duplicates by *title + year* so remakes with the same title remain distinct.
 
 ## Usage
-1. Open `index.html` in any modern browser (double‑click is fine).
-2. Enter a **Letterboxd username** (public) and press **Fetch films**.
-3. Optional: if your network blocks cross‑origin requests, set a different **CORS proxy** in *Advanced*.
+1. Upload the three files (`index.html`, `script.js`, `README.md`) to any static host (GitHub Pages, Netlify, etc.) or open `index.html` locally.
+2. Enter a Letterboxd username and click **Fetch**.
+3. Wait for the films to appear. Large collections may take 10–30 seconds.
 
-## Deploy
-- Drop these files on any static host (GitHub Pages, Netlify, S3, etc.).
-- No environment variables, no server.
+**Requirements**
+* The profile must be public.
+* Browser with ES6 support (any modern browser).
 
-## Notes & Limits
-- If a profile is **private** or the username is wrong, the fetch will fail.
-- Heavy users may have many pages; the script caps at 500 pages.
-- This outputs **unique films** with release years — not individual diary entries.
-- For complete diary entries (dates, rewatches), you’d need server-side scraping or Letterboxd’s export.
-
-## License
-MIT
+----
+MIT License.
