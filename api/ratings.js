@@ -43,44 +43,65 @@ function parsePage(html) {
   $("li").each((_, li) => {
     const $li = $(li);
 
-    // Prefer the film-poster node that carries data-film-*
-    const $poster = $li.find("[data-film-slug]").first();
-    const dataSlug = $poster.attr("data-film-slug");
-    const dataYear = $poster.attr("data-film-year");
-    const dataName = $poster.attr("data-film-name");
-
-    // Title
-    const $img = $li.find("img[alt]").first();
-    const title = (dataName || ($img.attr("alt") || "")).trim();
+    // ---- Title --------------------------------------------------------------
+    const title =
+      ($li.find("[data-film-name]").first().attr("data-film-name") ||
+       $li.find("img[alt]").first().attr("alt") || "")
+      .trim();
     if (!title) return;
 
-    // Slug + URL
-    let slug = dataSlug || null;
-    let href = null;
-    const $a = $li.find('a[href*="/film/"]').first();
-    if ($a.length) {
-      href = $a.attr("href") || null;
-      if (href && href.startsWith("/")) href = "https://letterboxd.com" + href;
-      if (!slug) {
-        const m = (href || "").match(/\/film\/([^/]+)\//);
-        if (m) slug = m[1];
-      }
-    }
-    if (!href && slug) href = `https://letterboxd.com/film/${slug}/`;
+    // ---- Slug ---------------------------------------------------------------
+    let slug = null;
 
-    // Year (prefer attribute; fallback to text scan)
-    let year = Number.isFinite(parseInt(dataYear, 10)) ? parseInt(dataYear, 10) : null;
+    // a) explicit data attribute
+    slug = $li.find("[data-film-slug]").first().attr("data-film-slug") || slug;
+
+    // b) anchor href
+    if (!slug) {
+      const href = $li.find('a[href*="/film/"]').first().attr("href") || "";
+      const m = href.match(/\/film\/([^/]+)/);
+      if (m) slug = m[1];
+    }
+
+    // c) other attributes some variants use
+    if (!slug) {
+      const dl =
+        $li.find("[data-target-link*='/film/']").first().attr("data-target-link") ||
+        $li.find("[data-film-link*='/film/']").first().attr("data-film-link") || "";
+      const m = dl.match(/\/film\/([^/]+)/);
+      if (m) slug = m[1];
+    }
+
+    // ---- Year ---------------------------------------------------------------
+    let year = null;
+
+    // from attributes
+    const yAttr =
+      $li.find("[data-film-year]").first().attr("data-film-year") ||
+      $li.find("[data-film-release-year]").first().attr("data-film-release-year");
+    if (yAttr && /^\d{4}$/.test(yAttr)) year = +yAttr;
+
+    // from nearby text
     if (!year) {
-      const yMatch = $li.text().match(/\b(19|20)\d{2}\b/);
-      if (yMatch) year = +yMatch[0];
+      const ym = ($li.find(".year,.metadata,small").first().text() || "").match(/\b(19|20)\d{2}\b/);
+      if (ym) year = +ym[0];
     }
 
-    // Rating
+    // from slug suffix e.g. "weapons-2025"
+    if (!year && slug) {
+      const ym = slug.match(/-(\d{4})$/);
+      if (ym) year = +ym[1];
+    }
+
+    // ---- Rating -------------------------------------------------------------
     const starsText = extractStarsText($li);
     const rating = starsTextToFloat(starsText);
-    if (rating !== null) {
-      items.push({ title, starsText, rating, slug, url: href || null, year });
-    }
+    if (rating === null) return;
+
+    // ---- Canonical URL (not the per-user diary URL) -------------------------
+    const url = slug ? `https://letterboxd.com/film/${slug}/` : null;
+
+    items.push({ title, starsText, rating, slug, url, year });
   });
 
   return items;
