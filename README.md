@@ -1,18 +1,22 @@
-# Minimal Letterboxd Username → Films Watched (Title + Year)
+# Minimal Letterboxd → Films & Years (static)
 
-**What it does:** A pure static page that asks for a Letterboxd username, then fetches the public diary pages and extracts each film title and its release year. No server, no API keys.
+A single‑file site. Enter a Letterboxd username → it outputs recent films they watched plus release year.
 
-**How it works:** The browser requests the user’s diary pages via a CORS-friendly mirror, e.g.
-`https://r.jina.ai/http://letterboxd.com/<username>/films/diary/` (and `/page/2/`, …). It parses headings and the nearest 4‑digit year seen in the entry block.
+## How it works
+- Fetches the user’s public RSS feed (`/{username}/rss/`; falls back to `/{username}/films/rss/`) and parses `letterboxd:filmTitle` and `letterboxd:filmYear` tags. If those tags are missing, it extracts `Title (YYYY)` from the item title.
+- Fully client‑side; no build step or dependencies.
+- If direct CORS to Letterboxd is blocked, it automatically retries via the public CORS proxy **api.allorigins.win**.
 
-**Limitations:** 
-- Only works for **public** diary entries.
-- Heuristics may miss edge cases; bump “Pages” to traverse more.
-- If Letterboxd markup changes, the parser may need tweaks.
+## Limitations
+- Only public diaries are accessible.
+- RSS feeds generally expose the most recent entries (≈50), not full history.
+- Third‑party proxy reliability is not guaranteed; for production, add a tiny server or edge function to fetch RSS and set CORS headers.
 
-**Deploy:** Push these files to any static host (GitHub Pages, Netlify, Vercel static). Open `index.html`.
+## Deploy
+- **GitHub Pages:** push this repo and enable Pages → serve `index.html`.
+- **Vercel/Netlify:** drop the file into a new static project; no config needed.
 
-**Customization ideas (optional):**
-- Add CSV export of `Title,Year`.
-- Filter by year or dedupe rewatches.
-- Style tweaks or add GitHub corner link.
+## Local usage
+Open `index.html` in a browser and type a username (no `@`, any `https://letterboxd.com/<user>` URL works too).
+
+— generated for a minimal “just works” setup.
