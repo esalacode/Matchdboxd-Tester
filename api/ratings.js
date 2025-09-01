@@ -39,32 +39,50 @@ function starsTextToFloat(s) {
 function parsePage(html) {
   const $ = cheerio.load(html);
   const items = [];
+
   $("li").each((_, li) => {
     const $li = $(li);
-    const $img = $li.find("img[alt]").first();
-    if (!$img.length) return;
 
-    const title = ($img.attr("alt") || "").trim();
+    // Prefer the film-poster node that carries data-film-*
+    const $poster = $li.find("[data-film-slug]").first();
+    const dataSlug = $poster.attr("data-film-slug");
+    const dataYear = $poster.attr("data-film-year");
+    const dataName = $poster.attr("data-film-name");
+
+    // Title
+    const $img = $li.find("img[alt]").first();
+    const title = (dataName || ($img.attr("alt") || "")).trim();
     if (!title) return;
 
-    // Unique film identity: slug + url (best effort)
+    // Slug + URL
+    let slug = dataSlug || null;
+    let href = null;
     const $a = $li.find('a[href*="/film/"]').first();
-    let href = $a.attr("href") || "";
-    if (href && href.startsWith("/")) href = "https://letterboxd.com" + href;
-    const sm = (href || "").match(/\/film\/([^/]+)\//);
-    const slug = sm ? sm[1] : null;
+    if ($a.length) {
+      href = $a.attr("href") || null;
+      if (href && href.startsWith("/")) href = "https://letterboxd.com" + href;
+      if (!slug) {
+        const m = (href || "").match(/\/film\/([^/]+)\//);
+        if (m) slug = m[1];
+      }
+    }
+    if (!href && slug) href = `https://letterboxd.com/film/${slug}/`;
 
-    // Heuristic year extraction (optional)
-    let year = null;
-    const yMatch = $li.text().match(/\b(19|20)\d{2}\b/);
-    if (yMatch) year = +yMatch[0];
+    // Year (prefer attribute; fallback to text scan)
+    let year = Number.isFinite(parseInt(dataYear, 10)) ? parseInt(dataYear, 10) : null;
+    if (!year) {
+      const yMatch = $li.text().match(/\b(19|20)\d{2}\b/);
+      if (yMatch) year = +yMatch[0];
+    }
 
+    // Rating
     const starsText = extractStarsText($li);
     const rating = starsTextToFloat(starsText);
     if (rating !== null) {
       items.push({ title, starsText, rating, slug, url: href || null, year });
     }
   });
+
   return items;
 }
 
