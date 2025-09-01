@@ -1,22 +1,32 @@
-# Minimal Letterboxd → Films & Years (static)
+# Letterboxd → Films (Title + Year)
 
-A single‑file site. Enter a Letterboxd username → it outputs recent films they watched plus release year.
+Minimal static site: enter a **Letterboxd username** and it lists every film they’ve logged, with the **release year**. No server, no build.
 
+> ⚠️ **Public profiles only.** Letterboxd doesn’t offer a public API. This reads the public `/films/` pages in your browser via a CORS-friendly proxy.
+
+## Files
+- `index.html` – UI (single page)
+- `script.js` – tiny scraper (client-side)
+  
 ## How it works
-- Fetches the user’s public RSS feed (`/{username}/rss/`; falls back to `/{username}/films/rss/`) and parses `letterboxd:filmTitle` and `letterboxd:filmYear` tags. If those tags are missing, it extracts `Title (YYYY)` from the item title.
-- Fully client‑side; no build step or dependencies.
-- If direct CORS to Letterboxd is blocked, it automatically retries via the public CORS proxy **api.allorigins.win**.
+- Fetches paginated pages at `https://letterboxd.com/<username>/films/page/<n>/` via a CORS proxy (default: `https://cors.isomorphic-git.org/`).
+- Parses `data-film-name` and `data-film-release-year` (or `data-film-year`) attributes from poster elements.
+- Deduplicates and sorts by title, then lets you **download CSV** or **copy** the list.
 
-## Limitations
-- Only public diaries are accessible.
-- RSS feeds generally expose the most recent entries (≈50), not full history.
-- Third‑party proxy reliability is not guaranteed; for production, add a tiny server or edge function to fetch RSS and set CORS headers.
+## Usage
+1. Open `index.html` in any modern browser (double‑click is fine).
+2. Enter a **Letterboxd username** (public) and press **Fetch films**.
+3. Optional: if your network blocks cross‑origin requests, set a different **CORS proxy** in *Advanced*.
 
 ## Deploy
-- **GitHub Pages:** push this repo and enable Pages → serve `index.html`.
-- **Vercel/Netlify:** drop the file into a new static project; no config needed.
+- Drop these files on any static host (GitHub Pages, Netlify, S3, etc.).
+- No environment variables, no server.
 
-## Local usage
-Open `index.html` in a browser and type a username (no `@`, any `https://letterboxd.com/<user>` URL works too).
+## Notes & Limits
+- If a profile is **private** or the username is wrong, the fetch will fail.
+- Heavy users may have many pages; the script caps at 500 pages.
+- This outputs **unique films** with release years — not individual diary entries.
+- For complete diary entries (dates, rewatches), you’d need server-side scraping or Letterboxd’s export.
 
-— generated for a minimal “just works” setup.
+## License
+MIT

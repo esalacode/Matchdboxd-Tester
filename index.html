@@ -3,164 +3,89 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Letterboxd → Films & Years</title>
+  <title>Letterboxd → Films (Title + Year)</title>
+  <meta name="description" content="Enter a Letterboxd username to list all films they’ve logged, with release year. Pure static site." />
   <style>
-    :root { --fg:#111; --bg:#fff; --muted:#666; --accent:#0a7; }
-    @media (prefers-color-scheme: dark) {
-      :root { --fg:#eaeaea; --bg:#0c0c0c; --muted:#9a9a9a; --accent:#4dd; }
-    }
-    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";}
-    .wrap{max-width:720px;margin:40px auto;padding:0 16px;}
-    h1{font-size:1.4rem;margin:0 0 12px;}
-    p.small{color:var(--muted);font-size:.9rem;margin:6px 0 18px;}
-    form{display:flex;gap:8px;align-items:center;margin:0 0 16px;}
-    input[type=text]{flex:1;min-width:0;padding:10px 12px;border:1px solid #ccc;border-radius:10px;background:transparent;color:var(--fg);}
-    button{padding:10px 14px;border-radius:10px;border:0;background:var(--accent);color:#003;cursor:pointer;font-weight:600}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    .error{background:#ffeded;color:#7a1a1a;border:1px solid #f5b5b5;padding:10px 12px;border-radius:10px;margin:10px 0}
-    table{width:100%;border-collapse:collapse;margin-top:12px}
-    th,td{padding:8px 6px;border-bottom:1px solid rgba(127,127,127,.2);text-align:left}
-    th{font-size:.9rem;color:var(--muted);font-weight:600}
-    .muted{color:var(--muted)}
-    .tip{font-size:.85rem;color:var(--muted);margin-top:8px}
-    footer{margin-top:28px;color:var(--muted);font-size:.85rem}
-    code{background:rgba(127,127,127,.2);padding:2px 6px;border-radius:6px}
+    :root { --fg:#111; --bg:#fff; --muted:#666; --accent:#0b5cff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji","Segoe UI Emoji"; color: var(--fg); background: var(--bg); }
+    header { padding: 24px 16px; border-bottom: 1px solid #eee; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    main { max-width: 900px; margin: 0 auto; padding: 16px; }
+    .card { border: 1px solid #eee; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.03); }
+    label { font-weight: 600; font-size: 14px; display:block; margin-bottom:6px; }
+    input[type="text"] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 14px; }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+    button { border: 1px solid #ccc; padding: 10px 14px; border-radius: 10px; background: #f7f7f7; cursor: pointer; font-weight: 600; }
+    button.primary { background: var(--accent); color:#fff; border-color: var(--accent); }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .spacer { height: 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; font-size: 14px; }
+    th { background: #fafafa; position: sticky; top: 0; }
+    #status { margin-top: 8px; min-height: 18px; }
+    .right { margin-left: auto; }
+    details { margin-top: 8px; }
+    code { background: #f5f5f5; padding: 2px 6px; border-radius: 6px; }
+    footer { padding: 24px 16px; color:#777; text-align:center; font-size: 12px;}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Letterboxd → Films &amp; Years</h1>
-    <p class="small">Enter a Letterboxd username to list recent diary entries as <em>Film — Year</em>. All client‑side. No tracking.</p>
-    <form id="f">
-      <input id="u" type="text" placeholder="e.g. scorsese" autocomplete="on" />
-      <button id="go" type="submit">Fetch</button>
-    </form>
-    <div id="status" class="muted"></div>
-    <div id="out"></div>
-    <p class="tip">Tip: Diaries must be public. Feeds expose the most recent entries (typically up to 50).</p>
-    <footer>
-      <div>Built for a minimal static host (GitHub Pages, Vercel, etc.).</div>
-    </footer>
-  </div>
+  <header>
+    <h1>Letterboxd → Films (Title + Year)</h1>
+    <div class="muted">Enter a public Letterboxd username. This runs entirely in your browser.</div>
+  </header>
 
-<script>
-const $ = (sel) => document.querySelector(sel);
-const statusEl = $("#status");
-const outEl = $("#out");
-const input = $("#u");
-const form = $("#f");
-const btn = $("#go");
+  <main>
+    <div class="card">
+      <div class="row">
+        <div style="flex: 1 1 260px;">
+          <label for="username">Letterboxd username</label>
+          <input id="username" type="text" placeholder="e.g. davidlynch" autocomplete="username" />
+        </div>
+        <div class="row" style="align-self:flex-end;">
+          <button id="run" class="primary">Fetch films</button>
+          <button id="downloadCsv" disabled>Download CSV</button>
+          <button id="copy" disabled>Copy to clipboard</button>
+        </div>
+      </div>
+      <div id="status" class="muted"></div>
 
-function normUsername(raw) {
-  let u = (raw || "").trim();
-  if (!u) return "";
-  u = u.replace(/^@/, "");
-  u = u.replace(/^https?:\/\/letterboxd\.com\//i, "");
-  u = u.replace(/\/.*/, ""); // drop trailing path
-  return u;
-}
+      <details>
+        <summary>Advanced</summary>
+        <div class="spacer"></div>
+        <div class="row">
+          <label for="proxy" class="muted">CORS proxy (optional)</label>
+          <input id="proxy" type="text" placeholder="https://cors.isomorphic-git.org/" />
+          <button id="testProxy">Test proxy</button>
+        </div>
+        <div class="muted">If Letterboxd blocks cross‑origin requests, set a CORS proxy. Default works for most people.</div>
+      </details>
+    </div>
 
-async function fetchTextWithFallback(url) {
-  // Try direct fetch first (works if Letterboxd sends CORS headers).
-  try {
-    const r = await fetch(url, {mode:"cors"});
-    if (r.ok) return await r.text();
-    throw new Error("HTTP " + r.status);
-  } catch (e) {
-    // Fallback via public CORS proxy (no guarantees).
-    const proxied = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
-    const r2 = await fetch(proxied);
-    if (r2.ok) return await r2.text();
-    throw new Error("Fetch failed (CORS and proxy).");
-  }
-}
+    <div class="spacer"></div>
 
-function parseItemsFromRSS(xmlText) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlText, "application/xml");
-  // Handle parsererror
-  if (doc.querySelector("parsererror")) {
-    throw new Error("Unexpected response (not valid RSS/XML).");
-  }
-  const items = Array.from(doc.querySelectorAll("item"));
-  const rows = items.map(item => {
-    // Prefer official namespaced tags if present.
-    const lbTitle = item.querySelector("letterboxd\\:filmTitle, film\\:filmTitle, filmTitle");
-    const lbYear  = item.querySelector("letterboxd\\:filmYear, film\\:filmYear, filmYear");
-    let title = lbTitle ? lbTitle.textContent.trim() : "";
-    let year  = lbYear ? lbYear.textContent.trim() : "";
+    <div class="card">
+      <div class="row">
+        <div><strong>Results</strong> <span id="count" class="muted">(0)</span></div>
+        <div class="right muted" id="elapsed"></div>
+      </div>
+      <div class="spacer"></div>
+      <table id="resultsTable" style="display:none;">
+        <thead>
+          <tr><th style="width:70%;">Film</th><th>Year</th></tr>
+        </thead>
+        <tbody id="results"></tbody>
+      </table>
+      <div id="empty" class="muted">No data yet.</div>
+    </div>
+  </main>
 
-    if (!title || !year) {
-      // Fallback to item <title> e.g. "Eddie watched Inception (2010) ★★★★"
-      const t = (item.querySelector("title")?.textContent || "").trim();
-      const m = t.match(/\b([^(]+?)\s*\((\d{4})\)/);
-      if (!title && m) title = m[1].trim();
-      if (!year && m) year = m[2];
-    }
-    return title && year ? { title, year } : null;
-  }).filter(Boolean);
+  <footer>
+    Built as a tiny static tool (no server). Private profiles won’t work.
+  </footer>
 
-  return rows;
-}
-
-function renderTable(rows, username, source) {
-  if (!rows.length) {
-    outEl.innerHTML = '<div class="error">No recent public diary entries found for <strong>' + username + '</strong>.</div>';
-    return;
-  }
-  const dedup = new Map(); // title|year -> {title,year}
-  for (const r of rows) dedup.set(r.title + "|" + r.year, r);
-  const unique = Array.from(dedup.values());
-
-  const head = '<table><thead><tr><th>Film</th><th>Year</th></tr></thead><tbody>';
-  const body = unique.map(r => '<tr><td>' + escapeHtml(r.title) + '</td><td>' + escapeHtml(r.year) + '</td></tr>').join("");
-  const tail = '</tbody></table>';
-  outEl.innerHTML = head + body + tail + '<div class="muted" style="margin-top:8px">Source: ' + source + '</div>';
-}
-
-function escapeHtml(s){return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-
-async function handleSubmit(ev){
-  ev.preventDefault();
-  const username = normUsername(input.value);
-  if(!username){ outEl.innerHTML = '<div class="error">Enter a username.</div>'; return; }
-  outEl.innerHTML = "";
-  btn.disabled = true;
-  statusEl.textContent = "Fetching…";
-
-  const diaryURL = `https://letterboxd.com/${username}/rss/`;
-  const filmsURL = `https://letterboxd.com/${username}/films/rss/`;
-
-  // Try diary feed, then films feed.
-  let xml = null;
-  let used = null;
-  try {
-    xml = await fetchTextWithFallback(diaryURL);
-    used = diaryURL;
-  } catch (e1) {
-    try {
-      xml = await fetchTextWithFallback(filmsURL);
-      used = filmsURL;
-    } catch (e2) {
-      statusEl.textContent = "";
-      btn.disabled = false;
-      outEl.innerHTML = '<div class="error">Could not fetch RSS for <strong>' + username + '</strong>. The profile may be private or the username invalid.</div>';
-      return;
-    }
-  }
-
-  try {
-    const rows = parseItemsFromRSS(xml);
-    renderTable(rows, username, used);
-    statusEl.textContent = "";
-  } catch (err) {
-    outEl.innerHTML = '<div class="error">Parsed an unexpected feed format. Try again later.</div>';
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-form.addEventListener("submit", handleSubmit);
-</script>
+  <script src="./script.js"></script>
 </body>
 </html>
