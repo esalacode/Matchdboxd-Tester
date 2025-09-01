@@ -144,22 +144,36 @@ const filmKey = it => {
 };
 
 function computeOverlap(){
-  const mapA=new Map(), mapB=new Map(), display=new Map();
-  for(const it of lastA){
-    if(!it?.title) continue;
+  const mapA = new Map(), mapB = new Map();
+  const meta = new Map(); // k -> { title, year }
+
+  for (const it of lastA) {
+    if (!it?.title) continue;
     const k = filmKey(it);
-    mapA.set(k, it.rating); // one rating per film per user
-    if(!display.has(k)) display.set(k, it.year ? `${it.title} (${it.year})` : it.title);
+    mapA.set(k, it.rating);
+    const m = meta.get(k) || { title: it.title, year: null };
+    if (!m.title && it.title) m.title = it.title;
+    if (!m.year && it.year) m.year = it.year;
+    meta.set(k, m);
   }
-  for(const it of lastB){
-    if(!it?.title) continue;
+
+  for (const it of lastB) {
+    if (!it?.title) continue;
     const k = filmKey(it);
     mapB.set(k, it.rating);
-    if(!display.has(k)) display.set(k, it.year ? `${it.title} (${it.year})` : it.title);
+    const m = meta.get(k) || { title: it.title, year: null };
+    if (!m.title && it.title) m.title = it.title;
+    if (!m.year && it.year) m.year = it.year;
+    meta.set(k, m);
   }
-  const rows=[];
-  for(const [k,ra] of mapA.entries()){
-    if(mapB.has(k)) rows.push({title:display.get(k), a:ra, b:mapB.get(k)});
+
+  const rows = [];
+  for (const [k, ra] of mapA.entries()) {
+    if (mapB.has(k)) {
+      const m = meta.get(k) || {};
+      const name = m.year ? `${m.title} (${m.year})` : (m.title || "Untitled");
+      rows.push({ title: name, a: ra, b: mapB.get(k) });
+    }
   }
   rows.sort((x,y)=>x.title.localeCompare(y.title,'en',{sensitivity:'base'}));
   return rows;
