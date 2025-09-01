@@ -1,0 +1,15 @@
+{
+  "name": "matchboxd-vercel-ratings",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Static site \u2013 no build step\"",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

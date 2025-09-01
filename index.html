@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Matchboxd by eddıe</title>
+<style>
+:root { --bg:#0e141b; --fg:#c8d0d9; --muted:#8fa0ad; --grid:#1f2a35; --accent:#7dd3fc; --accent2:#a7f3d0; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--fg);}
+header { padding:16px; border-bottom:1px solid var(--grid); display:flex; align-items:center; justify-content:space-between; gap:12px;}
+header h1 { font-size:18px; margin:0;}
+.top-actions { display:flex; gap:8px; align-items:center; }
+.top-actions input[type=text]{ width:220px; padding:10px 12px; border-radius:10px; border:1px solid #2a3745; background:#0b1016; color:var(--fg); outline:none;}
+.top-actions input::placeholder{ color:#6a7b89;}
+button { padding:10px 14px; border-radius:10px; border:1px solid #2a3745; background:#0b1016; color:var(--fg); cursor:pointer;}
+button:hover { border-color:#35506a;}
+main { max-width:1620px; margin:24px auto; padding:0 16px 48px;}
+.grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:16px; }
+.card { background:#111922; border:1px solid var(--grid); border-radius:12px; padding:16px; box-shadow:0 1px 10px #0006;}
+label { display:block; font-size:14px; color:var(--muted); margin-bottom:6px;}
+.row{ display:flex; gap:8px; align-items:end;}
+.status{ margin-top:8px; color:var(--muted); min-height:1.4em;}
+.small{ font-size:12px; color:var(--muted);}
+table{ width:100%; border-collapse:collapse; margin-top:12px;}
+th,td{ padding:10px 8px; border-bottom:1px solid var(--grid); font-size:14px;}
+th{ text-align:left; color:var(--muted); font-weight:600;}
+.num{ text-align:right; font-variant-numeric: tabular-nums;}
+footer{ color:#6a7b89; text-align:center; font-size:12px; padding:12px 0 32px;}
+
+/* SVGs – APA Style */
+.svg { width:100%; height:420px; display:block; background:#ffffff; }
+.tick text { fill:#000000; font-size:13px; font-family: Arial, Helvetica, sans-serif; }
+.gridline{ stroke:#cccccc; stroke-width:1; }
+.diag{ stroke:#666666; stroke-dasharray:4 4; }
+.tooltip{ position:absolute; pointer-events:none; transform:translate(-50%, -120%);
+  background:#ffffff; border:1px solid #999; border-radius:4px;
+  padding:6px 8px; font-size:12px; color:#000000;
+  font-family: Arial, Helvetica, sans-serif;
+  white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.15); display:none; }
+#heatWrap, #histWrap { position:relative; width:100%; }
+.legend {
+  display:flex;
+  flex-wrap: wrap;
+  gap:8px 12px;
+  align-items:center;
+  font-size:12px;
+  color:#000000;
+  font-family: Arial, Helvetica, sans-serif;
+  margin-top:8px;
+}
+.swatch { width:12px; height:12px; border-radius:2px; }
+
+/* Prevent mobile zoom on inputs/buttons */
+input, button, select, textarea { font-size: 16px !important; }
+/* Stack header across all sizes */
+header { display:flex; flex-direction: column; align-items:center; gap:12px; text-align:center; }
+.top-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+@media (max-width: 560px){
+.top-actions{ flex-direction:column; align-items:stretch; }
+.top-actions input[type=text], .top-actions button { width:100%; }
+}
+</style>
+</head>
+<body>
+<header>
+<h1>Matchboxd by eddıe</h1>
+<div class="top-actions">
+<input id="userA" type="text" autocapitalize="none" autocomplete="off" placeholder="e.g., eddieslb" />
+<input id="userB" type="text" autocapitalize="none" autocomplete="off" placeholder="e.g., steedmanson" />
+<button id="fetchBoth">Fetch</button>
+</div>
+</header>
+
+<main>
+<div class="grid">
+<section class="card" id="panelM">
+<div class="row" style="justify-content:space-between; align-items:center">
+<label>Match Matrix</label>
+<div class="small" id="summaryM"></div>
+</div>
+<div id="statusM" class="status"></div>
+<div id="heatWrap">
+<svg id="heatSVG" class="svg" viewBox="0 0 600 600"></svg>
+<div id="heatTip" class="tooltip"></div>
+</div>
+<div id="hmLegend" class="legend"></div>
+</section>
+
+<section class="card" id="panelH">
+<div class="row" style="justify-content:space-between; align-items:center">
+<label>Agreement Graph</label>
+<div class="small" id="summaryH"></div>
+</div>
+<div id="statusH" class="status"></div>
+<div id="histWrap">
+<svg id="histSVG" class="svg" viewBox="0 0 700 500"></svg>
+<div id="histTip" class="tooltip"></div>
+</div>
+</section>
+
+<section class="card" id="panelO">
+<div class="row" style="justify-content:space-between; align-items:center">
+<label>Mutual Movies</label>
+<div class="small" id="summaryO"></div>
+</div>
+<div id="statusO" class="status"></div>
+<table id="tblO" hidden>
+<thead><tr><th style="width:60%">Title</th><th class="num" style="width:20%">A rating</th><th class="num" style="width:20%">B rating</th></tr></thead>
+<tbody></tbody>
+</table>
+<div class="small" id="stats"></div>
+</section>
+</div>
+
+<footer>Built for quick checks. Data scraped from public Letterboxd pages you provide.</footer>
+</main>
+
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+
+// --- Fetch -------------------------------------------------------------------
+function normUser(u){ if(!u) return null; u=String(u).trim().replace(/^@/,"").toLowerCase(); return /^[a-z0-9_-]{1,30}$/i.test(u)?u:null; }
+async function fetchRatings(user){
+  const res = await fetch(`/api/ratings?user=${encodeURIComponent(user)}`, {headers:{Accept:"application/json"}});
+  if(!res.ok) throw new Error(`API ${res.status}`); return res.json();
+}
+function setStatus(el,msg,isErr=false){ el.textContent = msg||""; el.style.color = isErr ? "#ffb3b3" : "#8fa0ad"; }
+
+// --- Shared state + overlap ---------------------------------------------------
+let lastA = [], lastB = [];
+
+// Unique identity key for a film: prefer slug, then url, then title+year
+const filmKey = it => {
+  if (!it) return null;
+  if (it.slug) return String(it.slug).toLowerCase();
+  if (it.url) {
+    const m = it.url.match(/\/film\/([^/]+)\//);
+    return (m ? m[1] : it.url).toLowerCase();
+  }
+  const t = (it.title||"").normalize("NFKD").toLowerCase().replace(/\s+/g," ").trim();
+  const y = it.year ? String(it.year) : "";
+  return `${t}|${y}`;
+};
+
+function computeOverlap(){
+  const mapA=new Map(), mapB=new Map(), display=new Map();
+  for(const it of lastA){
+    if(!it?.title) continue;
+    const k = filmKey(it);
+    mapA.set(k, it.rating); // one rating per film per user
+    if(!display.has(k)) display.set(k, it.year ? `${it.title} (${it.year})` : it.title);
+  }
+  for(const it of lastB){
+    if(!it?.title) continue;
+    const k = filmKey(it);
+    mapB.set(k, it.rating);
+    if(!display.has(k)) display.set(k, it.year ? `${it.title} (${it.year})` : it.title);
+  }
+  const rows=[];
+  for(const [k,ra] of mapA.entries()){
+    if(mapB.has(k)) rows.push({title:display.get(k), a:ra, b:mapB.get(k)});
+  }
+  rows.sort((x,y)=>x.title.localeCompare(y.title,'en',{sensitivity:'base'}));
+  return rows;
+}
+
+function calcStats(rows){
+  const n = rows.length; if(!n) return {n:0};
+  const diffs = rows.map(r=>r.a-r.b);
+  const abs = diffs.map(d=>Math.abs(d));
+  const mean = diffs.reduce((s,d)=>s+d,0)/n;
+  const mae  = abs.reduce((s,d)=>s+d,0)/n;
+  const pct0  = (abs.filter(d=>d===0).length/n)*100;
+  const pct05 = (abs.filter(d=>d<=0.5).length/n)*100;
+  const pct10 = (abs.filter(d=>d<=1.0).length/n)*100;
+  const ax = rows.map(r=>r.a), by = rows.map(r=>r.b);
+  const meanA = ax.reduce((s,x)=>s+x,0)/n, meanB = by.reduce((s,x)=>s+x,0)/n;
+  let num=0, denA=0, denB=0;
+  for(let i=0;i<n;i++){ const da=ax[i]-meanA, db=by[i]-meanB; num+=da*db; denA+=da*da; denB+=db*db; }
+  const r = (denA>0 && denB>0) ? (num/Math.sqrt(denA*denB)) : 0;
+  return {n, meanBias:mean, mae, pct0, pct05, pct10, r};
+}
+
+// --- Similarity / Agreement metrics ------------------------------------------
+function spearmanRho(rows){
+  const a = rows.map(r=>r.a), b = rows.map(r=>r.b);
+  const rank = arr => {
+    const pairs = arr.map((v,i)=>[v,i]).sort((x,y)=>x[0]-y[0]);
+    const r = Array(arr.length);
+    for(let i=0;i<pairs.length;){
+      let j=i; while(j<pairs.length && pairs[j][0]===pairs[i][0]) j++;
+      const avg = (i + j - 1)/2 + 1;
+      for(let k=i;k<j;k++) r[pairs[k][1]] = avg;
+      i=j;
+    }
+    return r;
+  };
+  const ra = rank(a), rb = rank(b);
+  return pearson(ra, rb);
+}
+
+function pearson(x,y){
+  const n=x.length; if(!n) return 0;
+  const mx=x.reduce((s,v)=>s+v,0)/n, my=y.reduce((s,v)=>s+v,0)/n;
+  let num=0, dx=0, dy=0;
+  for(let i=0;i<n;i++){ const a=x[i]-mx, b=y[i]-my; num+=a*b; dx+=a*a; dy+=b*b; }
+  return (dx>0 && dy>0) ? num/Math.sqrt(dx*dy) : 0;
+}
+
+function kappaQuadratic(rows){
+  const k=11, step=0.5, base=0.5;
+  const idx = v => Math.max(0, Math.min(k-1, Math.round((v-base)/step)));
+  const O = Array.from({length:k},()=>Array(k).fill(0));
+  rows.forEach(r=>{ O[idx(r.a)][idx(r.b)]++; });
+  const n = rows.length; if(!n) return 0;
+
+  const R = O.map(row=>row.reduce((s,x)=>s+x,0));
+  const C = Array.from({length:k},(_,j)=>O.reduce((s,row)=>s+row[j],0));
+  const W = Array.from({length:k},(_,i)=>Array.from({length:k},(_,j)=>1-((i-j)**2)/((k-1)**2)));
+
+  const Po = (1/n) * O.reduce((sum,row,i)=> sum + row.reduce((s,obs,j)=> s + W[i][j]*obs, 0), 0);
+  const Pe = (1/(n*n)) * W.reduce((sum,row,i)=> sum + row.reduce((s,wij,j)=> s + wij * R[i]*C[j], 0), 0);
+
+  return (1-Pe) ? (Po-Pe)/(1-Pe) : 0;
+}
+
+// --- Draw helpers -------------------------------------------------------------
+function gridAndTicks(
+  svg, W, H, m,
+  xMin, xMax, yMin, yMax,
+  xStep = 1, yStep = 1,
+  xLabel = "", yLabel = "",
+  centerXTicks = false, centerYTicks = false
+){
+  const x0=m.left, x1=W-m.right, y0=H-m.bottom, y1=m.top;
+  const plotW = x1 - x0, plotH = y0 - y1;
+
+  const xScale = v => x0 + ((v - xMin) / (xMax - xMin)) * plotW;
+  const yScale = v => y0 - ((v - yMin) / (yMax - yMin)) * plotH;
+
+  const xBins = Math.round((xMax - xMin)/xStep) + 1;
+  const yBins = Math.round((yMax - yMin)/yStep) + 1;
+  const bandX = plotW / xBins;
+  const bandY = plotH / yBins;
+  const xCenter = i => x0 + (i + 0.5) * bandX;
+  const yCenter = j => y0 - (j + 0.5) * bandY;
+
+  if (centerXTicks) {
+    for (let i = 0; i <= xBins; i++) {
+      const X = x0 + i * bandX;
+      const ln = document.createElementNS("http://www.w3.org/2000/svg","line");
+      ln.setAttribute("x1", X); ln.setAttribute("y1", y1);
+      ln.setAttribute("x2", X); ln.setAttribute("y2", y0);
+      ln.setAttribute("class","gridline"); ln.setAttribute("opacity","0.6");
+      svg.appendChild(ln);
+    }
+  } else {
+    for (let t = xMin; t <= xMax + 1e-9; t += xStep) {
+      const X = xScale(t);
+      const ln = document.createElementNS("http://www.w3.org/2000/svg","line");
+      ln.setAttribute("x1", X); ln.setAttribute("y1", y1);
+      ln.setAttribute("x2", X); ln.setAttribute("y2", y0);
+      ln.setAttribute("class","gridline"); ln.setAttribute("opacity","0.6");
+      svg.appendChild(ln);
+    }
+  }
+
+  if (centerYTicks) {
+    for (let j = 0; j <= yBins; j++) {
+      const Y = y0 - j * bandY;
+      const ln = document.createElementNS("http://www.w3.org/2000/svg","line");
+      ln.setAttribute("x1", x0); ln.setAttribute("y1", Y);
+      ln.setAttribute("x2", x1); ln.setAttribute("y2", Y);
+      ln.setAttribute("class","gridline"); ln.setAttribute("opacity","0.6");
+      svg.appendChild(ln);
+    }
+  } else {
+    for (let t = yMin; t <= yMax + 1e-9; t += yStep) {
+      const Y = yScale(t);
+      const ln = document.createElementNS("http://www.w3.org/2000/svg","line");
+      ln.setAttribute("x1", x0); ln.setAttribute("y1", Y);
+      ln.setAttribute("x2", x1); ln.setAttribute("y2", Y);
+      ln.setAttribute("class","gridline"); ln.setAttribute("opacity","0.6");
+      svg.appendChild(ln);
+    }
+  }
+
+  for (let i = 0; i < xBins; i++) {
+    const X = centerXTicks ? xCenter(i) : xScale(xMin + i*xStep);
+    const v = +(xMin + i*xStep).toFixed(1);
+    const xt = document.createElementNS("http://www.w3.org/2000/svg","text");
+    xt.setAttribute("x", X); xt.setAttribute("y", y0 + 22);
+    xt.setAttribute("text-anchor","middle"); xt.setAttribute("class","tick");
+    xt.textContent = v; svg.appendChild(xt);
+  }
+
+  for (let j = 0; j < yBins; j++) {
+    const Y = centerYTicks ? yCenter(j) : yScale(yMin + j*yStep);
+    const v = +(yMin + j*yStep).toFixed(1);
+    const yt = document.createElementNS("http://www.w3.org/2000/svg","text");
+    yt.setAttribute("x", x0 - 10); yt.setAttribute("y", Y);
+    yt.setAttribute("text-anchor","end");
+    yt.setAttribute("alignment-baseline","middle");
+    yt.setAttribute("dominant-baseline","central");
+    yt.setAttribute("class","tick");
+    yt.textContent = v; svg.appendChild(yt);
+  }
+
+  const xlabel = document.createElementNS("http://www.w3.org/2000/svg","text");
+  xlabel.setAttribute("x",(x0+x1)/2); xlabel.setAttribute("y", y0 + 44);
+  xlabel.setAttribute("text-anchor","middle"); xlabel.setAttribute("class","tick");
+  xlabel.textContent = xLabel; svg.appendChild(xlabel);
+
+  const ylabel = document.createElementNS("http://www.w3.org/2000/svg","text");
+  ylabel.setAttribute("transform",`translate(${m.left - 44} ${(y0+y1)/2}) rotate(-90)`);
+  ylabel.setAttribute("text-anchor","middle"); ylabel.setAttribute("class","tick");
+  ylabel.textContent = yLabel; svg.appendChild(ylabel);
+
+  return {xScale,yScale,x0,x1,y0,y1};
+}
+
+// --- Heatmap ------------------------------------------------------------------
+function drawHeatmap(rows, aName="A", bName="B"){
+  const svg=$("#heatSVG"), tip=$("#heatTip"), status=$("#statusM"), sum=$("#summaryM");
+  const W=600, H=600, m={left:68, right:28, top:36, bottom:72};
+  svg.innerHTML="";
+  if(!rows || !rows.length){ setStatus(status,"No overlap yet."); sum.textContent=""; return; }
+  setStatus(status,""); sum.textContent=`${rows.length} pairs`;
+
+  const {xScale,yScale,x0,x1,y0,y1} =
+  gridAndTicks(svg, W, H, m, 0.5, 5.0, 0.5, 5.0, 0.5, 0.5, `${aName} rating`, `${bName} rating`, true, true);
+
+  const step=0.5, base=0.5, vals=Array.from({length:10},(_,i)=>+(base + i*step).toFixed(1));
+
+  const counts = new Map(); let maxCount=0;
+  rows.forEach(r=>{
+    const ax = +(Math.round(r.a/step)*step).toFixed(1);
+    const by = +(Math.round(r.b/step)*step).toFixed(1);
+    const k = `${ax}|${by}`;
+    const v = (counts.get(k)||0) + 1;
+    counts.set(k, v);
+    if(v>maxCount) maxCount=v;
+  });
+
+  const bins = vals.length;
+  const bandX  = (x1 - x0) / bins;
+  const bandY  = (y0 - y1) / bins;
+  const cellW  = bandX * 0.92;
+  const cellH  = bandY * 0.92;
+  const padX   = (bandX - cellW) / 2;
+  const padY   = (bandY - cellH) / 2;
+
+  function color(t){
+    const v = Math.sqrt(Math.max(0,Math.min(1,t)));
+    const shade = 255 - Math.round(155*v);
+    return `rgb(${shade},${shade},255)`;
+  }
+
+  vals.forEach((ax, i)=>{
+    vals.forEach((by, j)=>{
+      const k = `${ax}|${by}`;
+      const v = counts.get(k) || 0;
+
+      const x = x0 + i * bandX + padX;
+      const y = y1 + (bins - 1 - j) * bandY + padY;
+      const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+      rect.setAttribute("x", x);
+      rect.setAttribute("y", y);
+      rect.setAttribute("width",  cellW);
+      rect.setAttribute("height", cellH);
+      rect.setAttribute("fill", v ? color(v/maxCount) : "rgb(240,240,255)");
+      rect.setAttribute("stroke", "#e6e6f8");
+      rect.addEventListener("mouseenter",()=>{
+        if(!v) return;
+        tip.style.display="block";
+        tip.textContent = `${aName} ${ax}★, ${bName} ${by}★ — ${v} (${Math.round(100*v/rows.length)}%)`;
+      });
+      rect.addEventListener("mousemove",e=>{
+        const rectB = $("#heatWrap").getBoundingClientRect();
+        tip.style.left=(e.clientX-rectB.left)+"px";
+        tip.style.top =(e.clientY-rectB.top)+"px";
+      });
+      rect.addEventListener("mouseleave",()=>{ tip.style.display="none"; });
+      svg.appendChild(rect);
+
+      if(v>0 && cellW>=40 && cellH>=24){
+        const t = document.createElementNS("http://www.w3.org/2000/svg","text");
+        t.setAttribute("x", x + cellW/2);
+        t.setAttribute("y", y + cellH/2 + 4);
+        t.setAttribute("text-anchor","middle");
+        t.setAttribute("class","tick");
+        t.textContent = v;
+        svg.appendChild(t);
+      }
+    });
+  });
+  const diag=document.createElementNS("http://www.w3.org/2000/svg","line");
+  diag.setAttribute("x1", x0);
+  diag.setAttribute("y1", y0);
+  diag.setAttribute("x2", x1);
+  diag.setAttribute("y2", y1);
+  diag.setAttribute("class","diag"); svg.appendChild(diag);
+
+  const legend = $("#hmLegend");
+  if(legend){
+    const steps = 8;
+    legend.innerHTML = `Count (bin frequency): `;
+    for(let i=0;i<steps;i++){
+      const sw = document.createElement("span");
+      sw.className = "swatch";
+      const v = 0.12 + 0.88*Math.sqrt(i/(steps-1));
+      const shade = 255 - Math.round(155*v);
+      sw.style.background = `rgb(${shade},${shade},255)`;
+      legend.appendChild(sw);
+    }
+    const lbl = document.createElement("span");
+    lbl.textContent = ` 1 … ${maxCount}`;
+    lbl.className = "small";
+    legend.appendChild(lbl);
+  }
+}
+
+// --- Histogram of absolute differences ---------------------------------------
+function drawHistogram(rows, aName="A", bName="B"){
+  const svg=$("#histSVG"), tip=$("#histTip"), status=$("#statusH"), sum=$("#summaryH");
+  const W=700, H=520, m={left:68, right:28, top:36, bottom:72};
+  svg.innerHTML="";
+  if(!rows || !rows.length){ setStatus(status,"No overlap yet."); sum.textContent=""; return; }
+  setStatus(status,"");
+
+  const step = 0.5;
+  const bins = Array.from({length:10}, (_,i) => +(i*step).toFixed(1)); // 0..4.5
+  const counts = new Array(bins.length).fill(0);
+  rows.forEach(r => { const d = Math.abs(r.a - r.b); const idx = Math.round(d/step); if(idx >= 0 && idx < counts.length) counts[idx]++; });
+  const n = rows.length;
+  const props = counts.map(c => (100*c/n));
+  const maxPct  = Math.max(...props, 0);
+  const yMaxDyn = Math.min(100, Math.max(10, Math.ceil(maxPct/10)*10));
+  sum.textContent = `${n} pairs · exact ${props[0].toFixed(0)}% · ≤0.5★ ${(props[0]+props[1]).toFixed(0)}% · ≤1★ ${(props[0]+props[1]+props[2]).toFixed(0)}%`;
+
+  const {xScale,yScale,x0,x1,y0,y1} =
+  gridAndTicks(svg, W, H, m,
+    0, 4.5,
+    0, yMaxDyn,
+    0.5, 10,
+    `|${aName}−${bName}| (★)`, "Share of titles (%)",
+    true, false);
+
+  const band = (x1 - x0) / bins.length;
+  const barW = band * 0.72;
+
+  bins.forEach((b, i) => {
+    const v = props[i];
+    const x = x0 + i * band + (band - barW) / 2;
+    const y = yScale(v);
+    const h = yScale(0) - y;
+
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", x); rect.setAttribute("y", y);
+    rect.setAttribute("width", barW); rect.setAttribute("height", Math.max(0, h));
+    rect.setAttribute("fill", "#666666");
+    rect.setAttribute("stroke", "#e0e0e0");
+    rect.addEventListener("mouseenter", ()=>{ tip.style.display="block"; tip.textContent = `|${aName}−${bName}| = ${b}★ → ${v.toFixed(1)}% (${counts[i]} films)`; });
+    rect.addEventListener("mousemove", e=>{ const rectW=$("#histWrap").getBoundingClientRect(); tip.style.left=(e.clientX-rectW.left)+"px"; tip.style.top=(e.clientY-rectW.top)+"px";});
+    rect.addEventListener("mouseleave", ()=>{ tip.style.display="none"; });
+    svg.appendChild(rect);
+
+    if(v >= 0.5){
+      const t = document.createElementNS("http://www.w3.org/2000/svg","text");
+      t.setAttribute("x", x + barW/2); t.setAttribute("y", y - 6);
+      t.setAttribute("text-anchor", "middle"); t.setAttribute("class","tick");
+      t.textContent = v.toFixed(0) + "%";
+      svg.appendChild(t);
+    }
+  });
+}
+
+// --- Orchestration ------------------------------------------------------------
+function updateAllViews(){
+  const rows = computeOverlap();
+
+  const status=$("#statusO"), tbl=$("#tblO"), tbody=$("#tblO tbody"), summary=$("#summaryO"), statsEl=$("#stats");
+  if(!rows.length){
+    setStatus(status,"Fetch both to see overlaps.");
+    tbl.hidden=true; summary.textContent=""; statsEl.textContent="";
+  } else {
+    setStatus(status,""); summary.textContent=`${rows.length} films in common`;
+    tbody.innerHTML = rows.map(r=>`<tr><td>${r.title}</td><td class="num">${r.a.toFixed(1)}</td><td class="num">${r.b.toFixed(1)}</td></tr>`).join("");
+    tbl.hidden=false;
+    const s = calcStats(rows);
+    const rho = spearmanRho(rows);
+    const kq  = kappaQuadratic(rows);
+    statsEl.textContent =
+      `Exact match: ${s.pct0.toFixed(0)}% · within ±0.5★: ${s.pct05.toFixed(0)}% · within ±1★: ${s.pct10.toFixed(0)}% ` +
+      `· bias (A−B): ${s.meanBias.toFixed(2)}★ · MAE: ${s.mae.toFixed(2)}★ · Spearman ρ: ${rho.toFixed(2)} · weighted κ: ${kq.toFixed(2)}`;
+  }
+
+  const aName = ($("#userA").value || "A").trim() || "A";
+  const bName = ($("#userB").value || "B").trim() || "B";
+  drawHeatmap(rows, aName, bName);
+  drawHistogram(rows, aName, bName);
+}
+
+async function runBoth(){
+  const status = $("#statusO");
+  const uA = normUser($("#userA").value);
+  const uB = normUser($("#userB").value);
+  if(!uA || !uB){ setStatus(status,"Enter two valid usernames.", true); return; }
+  setStatus(status,"Fetching both…");
+  try{
+    const [a, b] = await Promise.all([fetchRatings(uA), fetchRatings(uB)]);
+    lastA = a.items || [];
+    lastB = b.items || [];
+    setStatus(status,"");
+    updateAllViews();
+  }catch(e){
+    setStatus(status, e.message || String(e), true);
+    lastA = []; lastB = [];
+    updateAllViews();
+  }
+}
+$("#fetchBoth").addEventListener("click", runBoth);
+$("#userA").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
+$("#userB").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
+</script>
+</body>
+</html>
