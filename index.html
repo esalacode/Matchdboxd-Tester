@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Letterboxd Watched → Title + Year</title>
+  <style>
+    :root { --fg: #111; --bg: #fff; --muted:#666; --accent:#0a7; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";}
+    header{max-width:720px;margin:32px auto 16px;padding:0 16px}
+    h1{font-size:clamp(20px,3.6vw,28px);margin:0 0 8px}
+    p{margin:0 0 8px;color:var(--muted)}
+    main{max-width:720px;margin:0 auto;padding:0 16px 24px}
+    form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0 16px}
+    input,button{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid #ddd;outline:none}
+    input[type=text]{flex:1 1 220px}
+    button{background:var(--accent);color:#fff;border-color:transparent;cursor:pointer}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .small{font-size:12px;color:var(--muted)}
+    .error{color:#b00020}
+    .list{margin:16px 0 0;padding:0;list-style:none}
+    .list li{padding:6px 0;border-bottom:1px solid #eee}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-right-color:transparent;border-radius:50%;vertical-align:-2px;animation:spin .8s linear infinite;margin-right:6px}
+    @keyframes spin{to{transform: rotate(360deg)}}
+    .foot{margin-top:24px;font-size:12px;color:var(--muted)}
+    code{background:#f6f6f6;padding:2px 6px;border-radius:6px}
+    .controls{display:flex;align-items:center;gap:10px}
+    .count{font-size:13px;color:var(--muted);}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Letterboxd → films watched (title + release year)</h1>
+    <p class="small">Enter a Letterboxd <em>username</em>. This static page scrapes the public diary using a CORS-friendly mirror and extracts <strong>Film Title</strong> and <strong>Year</strong>.</p>
+  </header>
+  <main>
+    <form id="f">
+      <input id="u" type="text" placeholder="e.g. samlearner" autocomplete="off" required />
+      <div class="controls">
+        <label class="small">Pages <input id="pages" type="number" min="1" max="20" value="5" style="width:64px;margin-left:6px"/></label>
+      </div>
+      <button id="go" type="submit"><span id="spin" class="spinner" style="display:none"></span><span id="btn-label">Fetch</span></button>
+    </form>
+    <div id="status" class="small"></div>
+    <div class="count" id="count"></div>
+    <ul id="out" class="list"></ul>
+    <div class="foot">
+      <p>Notes: works only for public diaries. Source pages: <code>/&lt;username&gt;/films/diary/</code> (and <code>/page/2/</code>, …). No API keys. No server.</p>
+    </div>
+  </main>
+<script>
+const form = document.getElementById('f');
+const input = document.getElementById('u');
+const pagesInput = document.getElementById('pages');
+const out = document.getElementById('out');
+const statusEl = document.getElementById('status');
+const countEl = document.getElementById('count');
+const goBtn = document.getElementById('go');
+const spin = document.getElementById('spin');
+const btnLabel = document.getElementById('btn-label');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  out.innerHTML = '';
+  statusEl.textContent = '';
+  countEl.textContent = '';
+  const username = input.value.trim().replace(/^@/,''); 
+  if (!username) return;
+  goBtn.disabled = true; spin.style.display='inline-block'; btnLabel.textContent='Fetching…';
+  try {
+    const maxPages = Math.max(1, Math.min(20, parseInt(pagesInput.value || '5', 10)));
+    const items = await collectDiary(username, maxPages);
+    if (items.length === 0) {
+      statusEl.innerHTML = '<span class="error">No public diary entries found for this user.</span>';
+    } else {
+      // render
+      const frag = document.createDocumentFragment();
+      for (const it of items) {
+        const li = document.createElement('li');
+        li.textContent = it.year ? `${it.title} (${it.year})` : it.title;
+        frag.appendChild(li);
+      }
+      out.appendChild(frag);
+      countEl.textContent = `${items.length} titles`;
+    }
+  } catch (err) {
+    console.error(err);
+    statusEl.innerHTML = '<span class="error">Error: '+(err && err.message ? err.message : 'failed to fetch')+'</span>';
+  } finally {
+    goBtn.disabled = false; spin.style.display='none'; btnLabel.textContent='Fetch';
+  }
+});
+
+async function collectDiary(username, maxPages){
+  const items = [];
+  const seen = new Set(); // avoid dups by title + year
+  for (let page=1; page<=maxPages; page++){
+    const url = page === 1
+      ? `https://r.jina.ai/http://letterboxd.com/${encodeURIComponent(username)}/films/diary/`
+      : `https://r.jina.ai/http://letterboxd.com/${encodeURIComponent(username)}/films/diary/page/${page}/`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) break;
+    const text = await res.text();
+    // Heuristic: stop if page clearly has no entries
+    if (!/\bDiary\b/.test(text) || !/\n##\s+/.test(text)) {
+      if (page === 1 && /404|Not Found/i.test(text)) throw new Error('User not found');
+      break;
+    }
+    const pageItems = parseTitlesAndYears(text);
+    let fresh = 0;
+    for (const it of pageItems){
+      const key = `${it.title}::${it.year||''}`;
+      if (!seen.has(key)){
+        seen.add(key); items.push(it); fresh++;
+      }
+    }
+    if (fresh === 0) break; // nothing new -> stop early
+  }
+  return items;
+}
+
+// Parse r.jina.ai text output: lines with "## Title" followed by a nearby 4-digit year
+function parseTitlesAndYears(txt){
+  const lines = txt.split(/\r?\n/);
+  const items = [];
+  for (let i=0;i<lines.length;i++){
+    // Strip any link index markers like 【123†
+    const line = lines[i].replace(/\u3010\d+[^\u3011]*\u3011/g, '').trim();
+    if (line.startsWith('## ')){
+      let title = line.replace(/^##\s+/, '').trim();
+      // Clean any trailing artifacts
+      title = title.replace(/\s*Read the review\s*$/i,'').trim();
+      let year = null;
+      for (let j=i+1; j<Math.min(i+10, lines.length); j++){
+        const yline = lines[j].replace(/\u3010\d+[^\u3011]*\u3011/g, '').trim();
+        const m = yline.match(/\b(18|19|20)\d{2}\b/);
+        if (m){ year = m[0]; break; }
+      }
+      if (title) items.push({ title, year });
+    }
+  }
+  return items;
+}
+</script>
+</body>
+</html>
