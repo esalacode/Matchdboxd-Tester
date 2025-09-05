@@ -60,6 +60,29 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 .top-actions{ flex-direction:column; align-items:stretch; }
 .top-actions input[type=text], .top-actions button { width:100%; }
 }
+/* === Loading bar === */
+.loading-bar {
+  width: 100%;
+  height: 4px;
+  background: #223244;
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+  margin: 8px 0 16px;
+}
+.loading-bar-indeterminate {
+  position: absolute;
+  height: 100%;
+  width: 25%;
+  min-width: 80px;
+  background: linear-gradient(90deg, #007FFF 0%, #ff1fab 60%, #bf430b 100%);
+  border-radius: 2px;
+  animation: indeterminate-bar 1.3s cubic-bezier(.4,0,.2,1) infinite;
+}
+@keyframes indeterminate-bar {
+  0%   { left: -25%; }
+  100% { left: 100%; }
+}
 </style>
 </head>
 <body>
@@ -73,6 +96,9 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 </header>
 
 <main>
+  <div id="loadingBar" class="loading-bar" hidden aria-live="polite">
+  <div class="loading-bar-indeterminate"></div>
+</div>
 <div class="grid">
 <section class="card" id="panelM">
 <div class="row" style="justify-content:space-between; align-items:center">
@@ -117,6 +143,8 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 </main>
 
 <script>
+function showLoadingBar(){ document.getElementById("loadingBar").hidden = false; }
+function hideLoadingBar(){ document.getElementById("loadingBar").hidden = true; }
 const $ = (s, r=document) => r.querySelector(s);
 
 // --- Fetch -------------------------------------------------------------------
@@ -522,14 +550,17 @@ async function runBoth(){
   const uB = normUser($("#userB").value);
   if(!uA || !uB){ setStatus(status,"Enter two valid usernames.", true); return; }
   setStatus(status,"Fetching both…");
+  showLoadingBar();
   try{
     const [a, b] = await Promise.all([fetchRatings(uA), fetchRatings(uB)]);
     lastA = a.items || [];
     lastB = b.items || [];
     setStatus(status,"");
     updateAllViews();
+    hideLoadingBar();
   }catch(e){
     setStatus(status, e.message || String(e), true);
+    hideLoadingBar();
     lastA = []; lastB = [];
     updateAllViews();
   }
