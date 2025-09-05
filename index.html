@@ -123,21 +123,19 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
   </div>
   <div id="statusD" class="status"></div>
   <table id="descTbl">
-    <thead>
-      <tr>
-        <th>User</th>
-        <th class="num">n</th>
-        <th class="num">M</th>
-        <th class="num">SD</th>
-        <th class="num">MAE</th>
-        <th class="num">Spearman ρ</th>
-        <th class="num">p</th>
-        <th class="num">Weighted κ</th>
-        <th class="num">p</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <thead>
+    <tr>
+      <th>User</th>
+      <th class="num">n</th>
+      <th class="num">M</th>
+      <th class="num">SD</th>
+      <th class="num">MAE</th>
+      <th class="num">Spearman ρ</th>
+      <th class="num">Weighted κ</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
   <div class="small">* p &lt; .05, ** p &lt; .01, *** p &lt; .001</div>
 </section>
 
@@ -339,6 +337,11 @@ function starsForP(p){
   if(p < 0.05)  return "*";
   return "";
 }
+function pTip(p){
+  if(!isFinite(p)) return "p = —";
+  if(p < 0.001) return "p < .001";
+  return "p = " + String(p.toFixed(3)).replace(/^0\./, ".");
+}
 function pKappaPermutation(rows, perms){
   const n = rows.length; if(n<5) return NaN;
   const obs = kappaQuadratic(rows);
@@ -377,13 +380,13 @@ function renderDescriptiveStats(){
   const kq = nMut ? kappaQuadratic(rows) : NaN;
   const pK = isFinite(kq) && nMut>=5 ? pKappaPermutation(rows) : NaN;
   const fmt = (x,d=2)=> isFinite(x) ? x.toFixed(d) : "—";
-  const fmtp = p => isFinite(p) ? (p<0.001?"<.001":p.toFixed(3)) : "—";
-  tbody.innerHTML = [
-    `<tr><td>${aName}</td><td class="num">${aRatingsAll.length}</td><td class="num">${fmt(mA)}</td><td class="num">${fmt(sdA)}</td><td class="num">${fmt(mae)}</td><td class="num">${fmt(rho)}</td><td class="num">${fmtp(pRho)} ${starsForP(pRho)}</td><td class="num">${fmt(kq)}</td><td class="num">${fmtp(pK)} ${starsForP(pK)}</td></tr>`,
-    `<tr><td>${bName}</td><td class="num">${bRatingsAll.length}</td><td class="num">${fmt(mB)}</td><td class="num">${fmt(sdB)}</td><td class="num">${fmt(mae)}</td><td class="num">${fmt(rho)}</td><td class="num">${fmtp(pRho)} ${starsForP(pRho)}</td><td class="num">${fmt(kq)}</td><td class="num">${fmtp(pK)} ${starsForP(pK)}</td></tr>`
-  ].join("");
-  summary.textContent = nMut ? `${nMut} mutual films used for MAE/ρ/κ` : "No mutual films";
-  tbl.hidden = false;
+
+  const rhoCell = `<td class="num" title="${pTip(pRho)}">${fmt(rho)} ${starsForP(pRho)}</td>`;
+const kCell   = `<td class="num" title="${pTip(pK)}">${fmt(kq)} ${starsForP(pK)}</td>`;
+tbody.innerHTML = [
+  `<tr><td>${aName}</td><td class="num">${aRatingsAll.length}</td><td class="num">${fmt(mA)}</td><td class="num">${fmt(sdA)}</td><td class="num">${fmt(mae)}</td>${rhoCell}${kCell}</tr>`,
+  `<tr><td>${bName}</td><td class="num">${bRatingsAll.length}</td><td class="num">${fmt(mB)}</td><td class="num">${fmt(sdB)}</td><td class="num">${fmt(mae)}</td>${rhoCell}${kCell}</tr>`
+].join("");
 }
 
 // --- Draw helpers -------------------------------------------------------------
