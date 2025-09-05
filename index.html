@@ -73,6 +73,7 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
   animation:lb-sweep 1.15s cubic-bezier(.4,0,.2,1) infinite;
 }
 @keyframes lb-sweep{ 0%{ left:-20%; } 100%{ left:100%; } }
+  #panelD .stats-lines div{ margin-top:4px; }
 </style>
 </head>
 <body>
@@ -122,21 +123,20 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
     <div class="small" id="summaryD"></div>
   </div>
   <div id="statusD" class="status"></div>
-  <table id="descTbl">
-  <thead>
-    <tr>
-      <th>User</th>
-      <th class="num">n</th>
-      <th class="num">M</th>
-      <th class="num">SD</th>
-      <th class="num">MAE</th>
-      <th class="num">Spearman ρ</th>
-      <th class="num">Weighted κ</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
-  <div class="small">* p &lt; .05, ** p &lt; .01, *** p &lt; .001</div>
+    <table id="descTbl">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th class="num">n</th>
+        <th class="num">M</th>
+        <th class="num">SD</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="pairStats" class="small stats-lines"></div>
+  <div class="small" id="p-legend">* p &lt; .05, ** p &lt; .01, *** p &lt; .001</div>
 </section>
 
 <section class="card" id="panelO">
@@ -363,12 +363,14 @@ function renderDescriptiveStats(){
   const status=$("#statusD"), tbl=$("#descTbl"), tbody=$("#descTbl tbody"), summary=$("#summaryD");
   const aName = ($("#userA").value || "A").trim() || "A";
   const bName = ($("#userB").value || "B").trim() || "B";
+    if(!lastA.length || !lastB.length){
+    status.textContent = "Fetch both users.";
+    tbl.hidden = true; summary.textContent="";
+    const ps = $("#pairStats"); if (ps) ps.innerHTML = "";
+    return;
+  }
   const rows = computeOverlap();
   const nMut = rows.length;
-  if(!lastA.length || !lastB.length){
-    status.textContent = "Fetch both users.";
-    tbl.hidden = true; summary.textContent=""; return;
-  }
   status.textContent="";
   const aRatingsAll = lastA.map(it=>it.rating).filter(v=>typeof v==="number");
   const bRatingsAll = lastB.map(it=>it.rating).filter(v=>typeof v==="number");
@@ -381,14 +383,25 @@ function renderDescriptiveStats(){
   const pK = isFinite(kq) && nMut>=5 ? pKappaPermutation(rows) : NaN;
   const fmt = (x,d=2)=> isFinite(x) ? x.toFixed(d) : "—";
 
-  const rhoCell = `<td class="num" title="${pTip(pRho)}">${fmt(rho)} ${starsForP(pRho)}</td>`;
-const kCell   = `<td class="num" title="${pTip(pK)}">${fmt(kq)} ${starsForP(pK)}</td>`;
+// table rows: per-user n, M, SD
 tbody.innerHTML = [
-  `<tr><td>${aName}</td><td class="num">${aRatingsAll.length}</td><td class="num">${fmt(mA)}</td><td class="num">${fmt(sdA)}</td><td class="num">${fmt(mae)}</td>${rhoCell}${kCell}</tr>`,
-  `<tr><td>${bName}</td><td class="num">${bRatingsAll.length}</td><td class="num">${fmt(mB)}</td><td class="num">${fmt(sdB)}</td><td class="num">${fmt(mae)}</td>${rhoCell}${kCell}</tr>`
+  `<tr><td>${aName}</td><td class="num">${aRatingsAll.length}</td><td class="num">${fmt(mA)}</td><td class="num">${fmt(sdA)}</td></tr>`,
+  `<tr><td>${bName}</td><td class="num">${bRatingsAll.length}</td><td class="num">${fmt(mB)}</td><td class="num">${fmt(sdB)}</td></tr>`
 ].join("");
-}
 
+// pair lines: MAE, Spearman’s ρ, Weighted κ
+const pair = $("#pairStats");
+pair.innerHTML = [
+  `MAE = ${fmt(mae)}`,
+  `Spearman\u2019s \u03C1 = ${fmt(rho)}${starsForP(pRho)}`,
+  `Weighted \u03BA (quadratic) = ${fmt(kq)}${starsForP(pK)}`
+].map((s,i)=> i===0 ? `<div>${s}</div>`
+                    : `<div title="${i===1 ? pTip(pRho) : pTip(pK)}">${s}</div>`).join("");
+
+// footer line
+summary.textContent = nMut ? `${nMut} mutual films used for MAE/ρ/κ` : "No mutual films";
+tbl.hidden = false;
+}
 // --- Draw helpers -------------------------------------------------------------
 function gridAndTicks(
   svg, W, H, m,
