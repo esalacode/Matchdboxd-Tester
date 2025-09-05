@@ -389,14 +389,13 @@ tbody.innerHTML = [
   `<tr><td>${bName}</td><td class="num">${bRatingsAll.length}</td><td class="num">${fmt(mB)}</td><td class="num">${fmt(sdB)}</td></tr>`
 ].join("");
 
-// pair lines: MAE, Spearman’s ρ, Weighted κ
+// pair lines: MAE, Spearman's ρ, Cohen's κ
 const pair = $("#pairStats");
 pair.innerHTML = [
-  `MAE = ${fmt(mae)}`,
-  `Spearman\u2019s \u03C1 = ${fmt(rho)}${starsForP(pRho)}`,
-  `Weighted \u03BA (quadratic) = ${fmt(kq)}${starsForP(pK)}`
-].map((s,i)=> i===0 ? `<div>${s}</div>`
-                    : `<div title="${i===1 ? pTip(pRho) : pTip(pK)}">${s}</div>`).join("");
+  `<div>MAE = ${fmt(mae)}</div>`,
+  `<div title="${pTip(pRho)}">Spearman's \u03C1 = ${fmt(rho)}${starsForP(pRho)}</div>`,
+  `<div title="${pTip(pK)}">Cohen's \u03BA = ${fmt(kq)}${starsForP(pK)}</div>`
+].join("");
 
 // footer line
 summary.textContent = nMut ? `${nMut} mutual films used for MAE/ρ/κ` : "No mutual films";
@@ -670,7 +669,7 @@ function updateAllViews(){
     const kq  = kappaQuadratic(rows);
     statsEl.textContent =
       `Exact match: ${s.pct0.toFixed(0)}% · within ±0.5★: ${s.pct05.toFixed(0)}% · within ±1★: ${s.pct10.toFixed(0)}% ` +
-      `· bias (A−B): ${s.meanBias.toFixed(2)}★ · MAE: ${s.mae.toFixed(2)}★ · Spearman ρ: ${rho.toFixed(2)} · weighted κ: ${kq.toFixed(2)}`;
+      `· bias (A−B): ${s.meanBias.toFixed(2)}★ · MAE: ${s.mae.toFixed(2)}★ · Spearman ρ: ${rho.toFixed(2)} · Cohen's κ: ${kq.toFixed(2)}`;
   }
 
   const aName = ($("#userA").value || "A").trim() || "A";
