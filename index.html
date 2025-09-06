@@ -265,18 +265,23 @@ function pearson(x,y){
 }
 
 function kappaQuadratic(rows){
-  const k=11, step=0.5, base=0.5;
-  const idx = v => Math.max(0, Math.min(k-1, Math.round((v-base)/step)));
+  // ratings are 0.5..5.0 in 0.5 steps → 10 categories
+  const step = 0.5, base = 0.5, vmax = 5.0;
+  const k = Math.round((vmax - base)/step) + 1; // =10
+  const idx = v => Math.max(0, Math.min(k-1, Math.round((v - base)/step)));
+
   const O = Array.from({length:k},()=>Array(k).fill(0));
-  rows.forEach(r=>{ O[idx(r.a)][idx(r.b)]++; });
+  for(const r of rows){ O[idx(r.a)][idx(r.b)]++; }
   const n = rows.length; if(!n) return 0;
 
   const R = O.map(row=>row.reduce((s,x)=>s+x,0));
   const C = Array.from({length:k},(_,j)=>O.reduce((s,row)=>s+row[j],0));
-  const W = Array.from({length:k},(_,i)=>Array.from({length:k},(_,j)=>1-((i-j)**2)/((k-1)**2)));
+  // correct denominator uses (k-1)^2 with k=10 → (9)^2 = 81
+  const denom = (k-1)*(k-1);
+  const W = Array.from({length:k},(_,i)=>Array.from({length:k},(_,j)=>1 - ((i-j)*(i-j))/denom));
 
-  const Po = (1/n) * O.reduce((sum,row,i)=> sum + row.reduce((s,obs,j)=> s + W[i][j]*obs, 0), 0);
-  const Pe = (1/(n*n)) * W.reduce((sum,row,i)=> sum + row.reduce((s,wij,j)=> s + wij * R[i]*C[j], 0), 0);
+  const Po = (1/n) * O.reduce((S,row,i)=> S + row.reduce((s,obs,j)=> s + W[i][j]*obs, 0), 0);
+  const Pe = (1/(n*n)) * W.reduce((S,row,i)=> S + row.reduce((s,wij,j)=> s + wij * R[i]*C[j], 0), 0);
 
   return (1-Pe) ? (Po-Pe)/(1-Pe) : 0;
 }
@@ -348,16 +353,27 @@ function pKappaPermutation(rows, perms){
   const a = rows.map(r=>r.a), b = rows.map(r=>r.b);
   let extreme = 0;
   function shuffle(x){ x=x.slice(); for(let i=x.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [x[i],x[j]]=[x[j],x[i]]; } return x; }
-  const P = Math.max(200, Math.min(1200, Math.round(80000 / Math.max(50, n))));
-  const runs = perms || P;
+  const runs = perms || 10000;  // ↑ was 200–1200
   for(let r=0;r<runs;r++){
     const sb = shuffle(b);
-    const rows2 = a.map((v,i)=>({a:v, b:sb[i]}));
-    const k = kappaQuadratic(rows2);
+    const k = kappaQuadratic(a.map((v,i)=>({a:v,b:sb[i]})));
     if(Math.abs(k) >= Math.abs(obs)) extreme++;
   }
-  const p = (extreme + 1) / (runs + 1);
-  return Math.max(0, Math.min(1, p));
+  return (extreme + 1) / (runs + 1);
+}
+function pSpearmanPermutation(rows, perms){
+  const n = rows.length; if(n<3) return NaN;
+  const obs = Math.abs(spearmanRho(rows));
+  const a = rows.map(r=>r.a), b = rows.map(r=>r.b);
+  let extreme = 0;
+  function sh(x){ x=x.slice(); for(let i=x.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [x[i],x[j]]=[x[j],x[i]];} return x; }
+  const runs = perms || 10000;
+  for(let r=0;r<runs;r++){
+    const sb = sh(b);
+    const rho = Math.abs(spearmanRho(a.map((v,i)=>({a:v,b:sb[i]}))));
+    if(rho >= obs) extreme++;
+  }
+  return (extreme + 1) / (runs + 1);
 }
 function renderDescriptiveStats(){
   const status=$("#statusD"), tbl=$("#descTbl"), tbody=$("#descTbl tbody"), summary=$("#summaryD");
