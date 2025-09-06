@@ -394,7 +394,7 @@ function renderDescriptiveStats(){
   const {mean: mB, sd: sdB} = meanSD(bRatingsAll);
   const mae = nMut ? rows.reduce((s,r)=>s + Math.abs(r.a - r.b), 0)/nMut : NaN;
   const rho = nMut ? spearmanRho(rows) : NaN;
-  const pRho = isFinite(rho) && nMut>=3 ? pFromRho(rho, nMut) : NaN;
+  const pRho = isFinite(rho) && nMut>=3 ? pSpearmanPermutation(rows, 10000) : NaN;
   const kq = nMut ? kappaQuadratic(rows) : NaN;
   const pK = isFinite(kq) && nMut>=5 ? pKappaPermutation(rows) : NaN;
   const fmt = (x,d=2)=> isFinite(x) ? x.toFixed(d) : "—";
