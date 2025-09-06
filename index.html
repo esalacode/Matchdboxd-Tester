@@ -13,8 +13,8 @@ header h1 { font-size:18px; margin:0;}
 .top-actions { display:flex; gap:8px; align-items:center; }
 .top-actions input[type=text]{ width:220px; padding:10px 12px; border-radius:10px; border:1px solid #2a3745; background:#0b1016; color:var(--fg); outline:none;}
 .top-actions input::placeholder{ color:#6a7b89;}
-button { padding:10px 14px; border-radius:10px; border:1px solid #2a3745; background:#0b1016; color:var(--fg); cursor:pointer;}
-button:hover { border-color:#35506a;}
+
+
 main { max-width:1620px; margin:24px auto; padding:0 16px 48px;}
 .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:16px; }
 .card { background:#111922; border:1px solid var(--grid); border-radius:12px; padding:16px; box-shadow:0 1px 10px #0006;}
@@ -58,7 +58,7 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 .top-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
 @media (max-width: 560px){
 .top-actions{ flex-direction:column; align-items:stretch; }
-.top-actions input[type=text], .top-actions button { width:100%; }
+.top-actions input[type=text] { width:100%; }
 }
 /* === Loading bar (viewport sweep) === */
 .loading-bar{
@@ -82,7 +82,7 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 <div class="top-actions">
 <input id="userA" type="text" autocapitalize="none" autocomplete="off" placeholder="e.g., eddieslb" />
 <input id="userB" type="text" autocapitalize="none" autocomplete="off" placeholder="e.g., steedmanson" />
-<button id="fetchBoth">Fetch</button>
+
 </div>
 </header>
 
@@ -716,7 +716,7 @@ async function runBoth(){
     updateAllViews();
   }
 }
-$("#fetchBoth").addEventListener("click", runBoth);
+
 $("#userA").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
 $("#userB").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
 </script>
