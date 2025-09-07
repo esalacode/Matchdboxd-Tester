@@ -700,7 +700,7 @@ async function runBoth(){
   const uA = normUser($("#userA").value);
   const uB = normUser($("#userB").value);
   if(!uA || !uB){ setStatus(status,"Enter two valid usernames.", true); return; }
-  setStatus(status,"Fetching both…");
+  
   showLoadingBar();
   try{
     const [a, b] = await Promise.all([fetchRatings(uA), fetchRatings(uB)]);
