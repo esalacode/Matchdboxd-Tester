@@ -666,9 +666,9 @@ function updateAllViews(){
     const s = calcStats(rows);
     const rho = spearmanRho(rows);
     const kq  = kappaQuadratic(rows);
-    statsEl.textContent =
-      `Exact match: ${s.pct0.toFixed(0)}% · within ±0.5★: ${s.pct05.toFixed(0)}% · within ±1★: ${s.pct10.toFixed(0)}% ` +
-      `· bias (A−B): ${s.meanBias.toFixed(2)}★ · MAE: ${s.mae.toFixed(2)}★ · Spearman ρ: ${rho.toFixed(2)} · Cohen's κ: ${kq.toFixed(2)}`;
+      statsEl.textContent =
+      `Exact ${s.pct0.toFixed(0)}% · ≤0.5★ ${s.pct05.toFixed(0)}% · ≤1★ ${s.pct10.toFixed(0)}% ` +
+      `· Bias (A−B): ${s.meanBias.toFixed(2)}★ · MAE: ${s.mae.toFixed(2)}★ · Spearman's ρ: ${rho.toFixed(2)} · Cohen's κ: ${kq.toFixed(2)}`;
   }
 
   const aName = ($("#userA").value || "A").trim() || "A";
