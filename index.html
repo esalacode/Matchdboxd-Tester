@@ -101,7 +101,7 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 <svg id="heatSVG" class="svg" viewBox="0 0 600 600"></svg>
 <div id="heatTip" class="tooltip"></div>
 </div>
-<div id="hmLegend" class="legend"></div>
+
 </section>
 
 <section class="card" id="panelH">
@@ -594,23 +594,6 @@ function drawHeatmap(rows, aName="A", bName="B"){
   diag.setAttribute("y2", y1);
   diag.setAttribute("class","diag"); svg.appendChild(diag);
 
-  const legend = $("#hmLegend");
-  if(legend){
-    const steps = 8;
-    legend.innerHTML = `Count (bin frequency): `;
-    for(let i=0;i<steps;i++){
-      const sw = document.createElement("span");
-      sw.className = "swatch";
-      const v = 0.12 + 0.88*Math.sqrt(i/(steps-1));
-      const shade = 255 - Math.round(155*v);
-      sw.style.background = `rgb(${shade},${shade},255)`;
-      legend.appendChild(sw);
-    }
-    const lbl = document.createElement("span");
-    lbl.textContent = ` 1 … ${maxCount}`;
-    lbl.className = "small";
-    legend.appendChild(lbl);
-  }
 }
 
 // --- Histogram of absolute differences ---------------------------------------
