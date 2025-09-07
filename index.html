@@ -414,7 +414,7 @@ pair.innerHTML = [
 ].join("");
 
 // footer line
-summary.textContent = nMut ? `${nMut} mutual films used for MAE/ρ/κ` : "No mutual films";
+// summary.textContent = nMut ? `${nMut} mutual films used for MAE/ρ/κ` : "No mutual films";
 tbl.hidden = false;
 }
 // --- Draw helpers -------------------------------------------------------------
@@ -518,7 +518,7 @@ function drawHeatmap(rows, aName="A", bName="B"){
   const W=600, H=600, m={left:68, right:28, top:36, bottom:72};
   svg.innerHTML="";
   if(!rows || !rows.length){ setStatus(status,"No overlap yet."); sum.textContent=""; return; }
-  setStatus(status,""); sum.textContent=`${rows.length} pairs`;
+  setStatus(status,"");
 
   const {xScale,yScale,x0,x1,y0,y1} =
   gridAndTicks(svg, W, H, m, 0.5, 5.0, 0.5, 5.0, 0.5, 0.5, `${aName} rating`, `${bName} rating`, true, true);
@@ -612,7 +612,7 @@ function drawHistogram(rows, aName="A", bName="B"){
   const props = counts.map(c => (100*c/n));
   const maxPct  = Math.max(...props, 0);
   const yMaxDyn = Math.min(100, Math.max(10, Math.ceil(maxPct/10)*10));
-  sum.textContent = `${n} pairs · exact ${props[0].toFixed(0)}% · ≤0.5★ ${(props[0]+props[1]).toFixed(0)}% · ≤1★ ${(props[0]+props[1]+props[2]).toFixed(0)}%`;
+    sum.textContent = `Exact ${props[0].toFixed(0)}% · ≤0.5★ ${(props[0]+props[1]).toFixed(0)}% · ≤1★ ${(props[0]+props[1]+props[2]).toFixed(0)}%`;
 
   const {xScale,yScale,x0,x1,y0,y1} =
   gridAndTicks(svg, W, H, m,
