@@ -524,7 +524,8 @@ function gridAndTicks(
   return {xScale,yScale,x0,x1,y0,y1};
 }
 
-<script>
+///<script>
+  
 // --- Venn Diagram -------------------------------------------------------------
 function computeTotalsUnique(){
   const setA = new Set(), setB = new Set();
@@ -624,7 +625,6 @@ function drawVenn(totals, aName="A", bName="B"){
 
   if(sum) sum.textContent = `${aName} ${fmt(totA)} · ${bName} ${fmt(totB)} · common ${fmt(common)}`;
 }
-</script>
 
 // --- Heatmap ------------------------------------------------------------------
 function drawHeatmap(rows, aName="A", bName="B"){
