@@ -528,8 +528,8 @@ function gridAndTicks(
   
 // --- Venn Diagram -------------------------------------------------------------
 function computeTotalsUnique(){
-  const A = Array.isArray(window.lastA) ? window.lastA : [];
-  const B = Array.isArray(window.lastB) ? window.lastB : [];
+  const A = Array.isArray(lastA) ? lastA : [];
+  const B = Array.isArray(lastB) ? lastB : [];
   // count ONLY rated films
   const setA = new Set(), setB = new Set();
   for (const it of A) {
