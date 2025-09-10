@@ -526,128 +526,128 @@ function gridAndTicks(
 
 ///<script>
   
-// --- Venn Diagram -------------------------------------------------------------
-function computeTotalsUnique(){
+// --- Venn Diagram ---
+function renderVenn(ctx, W, H){
+  // inputs from the app
   const A = Array.isArray(lastA) ? lastA : [];
   const B = Array.isArray(lastB) ? lastB : [];
-  // count ONLY rated films
-  const setA = new Set(), setB = new Set();
-  for (const it of A) {
-    if (typeof it?.rating === "number") {
-      const k = filmKey(it); if (k) setA.add(k);
-    }
-  }
-  for (const it of B) {
-    if (typeof it?.rating === "number") {
-      const k = filmKey(it); if (k) setB.add(k);
-    }
-  }
-  let common = 0;
-  for (const k of setA) if (setB.has(k)) common++;
-  return { totA: setA.size, totB: setB.size, common };
-}
+  const aName = (window.userA || "A");
+  const bName = (window.userB || "B");
 
-function _overlapArea(r1, r2, d){
-  if (d >= r1 + r2) return 0;
-  if (d <= Math.abs(r1 - r2)) return Math.PI * Math.min(r1, r2) ** 2;
-  const clamp = x => Math.max(-1, Math.min(1, x));
-  const a1 = Math.acos(clamp((d*d + r1*r1 - r2*r2)/(2*d*r1)));
-  const a2 = Math.acos(clamp((d*d + r2*r2 - r1*r1)/(2*d*r2)));
-  const term = (-d + r1 + r2)*(d + r1 - r2)*(d - r1 + r2)*(d + r1 + r2);
-  return r1*r1*a1 + r2*r2*a2 - 0.5*Math.sqrt(Math.max(0, term));
-}
+  const totA = A.length;
+  const totB = B.length;
 
-function drawVenn(totals, aName="A", bName="B"){
-  const svg = document.querySelector("#vennSVG");
-  const status = document.querySelector("#statusV");
-  const sum = document.querySelector("#summaryV");
-  if(!svg) return;
-  svg.innerHTML = "";
+  // intersection size
+  const setA = new Set(A.map(m => m.name || m.id || m));
+  const common = (Array.isArray(B) ? B : []).reduce((n, m) => n + (setA.has(m.name || m.id || m) ? 1 : 0), 0);
 
-  const {totA, totB, common} = totals || {};
-  if(!isFinite(totA) || !isFinite(totB) || totA<=0 || totB<=0){
-    if(status) setStatus(status, "Enter two valid users.");
-    if(sum) sum.textContent = "";
+  // clear
+  ctx.clearRect(0,0,W,H);
+
+  // guard
+  if (!totA || !totB || !common){
+    drawHeading(`${aName} ${totA} · ${bName} ${totB} · common ${common}`);
+    drawPanelMessage("Enter two valid users or no common films.");
     return;
   }
-  if(status) setStatus(status, "");
 
-  const W=600, H=400, mL=40, mR=40, mT=20, mB=30;
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  // layout box
+  const mL = 24, mR = 24, mT = 64, mB = 24;
+  const boxW = W - mL - mR, boxH = H - mT - mB;
+  const cx0 = mL, cy = mT + boxH * 0.55;
 
-  // area-per-film c, scale to fit width AND height
-  let c = 12;
-  let r1 = Math.sqrt((c*totA)/Math.PI);
-  let r2 = Math.sqrt((c*totB)/Math.PI);
+  // radii from area ~ counts, scaled to fit height
+  const kH = boxH * 0.38; // max radius bound
+  const r0 = Math.sqrt(totA), r1 = Math.sqrt(totB);
+  let rA = r0, rB = r1;
+  const s = kH / Math.max(rA, rB);
+  rA *= s; rB *= s;
 
-  const plotW = W - mL - mR;
-  const plotH = H - mT - mB;
-  let sW = (r1 + r2) > 0 ? plotW / (r1 + r2) : 1;
-  let sH = Math.max(r1, r2) > 0 ? (plotH*0.8) / (2*Math.max(r1, r2)) : 1; // headroom
-  const s = Math.min(1, sW, sH);
-  if (s < 1){ r1*=s; r2*=s; c*=s*s; }
+  // target overlap area
+  const target = Math.PI * ( (rA*rA) * (common/totA) ); // initial scale guess keeps overlap fraction consistent
+  // but we want absolute 110 relative to 222 and 509 areas, so recompute with constant c:
+  const c = (rA*rA) / totA; // area-per-film scale
+  const A_target = c * common;
 
-  // solve distance for target overlap (= common rated)
-  const target = c * Math.max(0, Math.min(common, Math.min(totA, totB)));
-  const maxContain = Math.PI * Math.min(r1, r2) ** 2;
-  let d;
+  // binary search distance d that yields A_target
+  const minD = Math.abs(rA - rB);
+  const maxD = rA + rB;
+  const areaIntersect = (ra, rb, d) => {
+    // disjoint
+    if (d >= ra + rb) return 0;
+    // containment
+    if (d <= Math.abs(ra - rb)) return Math.PI * Math.min(ra, rb) ** 2;
 
-  if (target <= 0) {
-    d = r1 + r2;                 // disjoint
-  } else if (target >= maxContain) {
-    d = Math.abs(r1 - r2);       // containment
-  } else {
-    let lo = Math.abs(r1 - r2), hi = r1 + r2;
-    for (let i=0; i<80; i++){
-      const mid = 0.5*(lo+hi);
-      const area = _overlapArea(r1, r2, mid);
-      if (area >= target) hi = mid; else lo = mid;
-    }
-    d = Math.min(0.5*(lo+hi), r1 + r2 - 1e-6); // ensure visible overlap
+    const a1 = Math.acos((d*d + ra*ra - rb*rb)/(2*d*ra));
+    const a2 = Math.acos((d*d + rb*rb - ra*ra)/(2*d*rb));
+    const i = ra*ra*a1 + rb*rb*a2 - d*ra*Math.sin(a1);
+    return i;
+  };
+
+  let lo = minD, hi = maxD, d = maxD;
+  for (let i=0;i<40;i++){
+    const mid = 0.5*(lo+hi);
+    const ai = areaIntersect(rA, rB, mid);
+    if (ai > A_target) { lo = mid; } else { hi = mid; }
+  }
+  d = 0.5*(lo+hi);
+
+  // ensure it fits horizontally; rescale uniformly if needed
+  const maxWidth = boxW;
+  const sumSpan = d + rA + rB;
+  if (sumSpan > maxWidth){
+    const sf = maxWidth / sumSpan;
+    rA *= sf; rB *= sf; d *= sf;
   }
 
-  // center horizontally and vertically
-  const span = r1 + d + r2;
-  const cx1 = mL + (plotW - span)/2 + r1;
-  const cx2 = cx1 + d;
-  const cy  = mT + plotH/2;
+  // centers
+  const xA = cx0 + rA;
+  const xB = xA + d;
 
-  const make = n => document.createElementNS("http://www.w3.org/2000/svg", n);
+  // draw
+  drawHeading(`${aName} ${totA} · ${bName} ${totB} · common ${common}`);
 
   // circles
-  const c1 = make("circle");
-  c1.setAttribute("cx", cx1); c1.setAttribute("cy", cy); c1.setAttribute("r", r1);
-  c1.setAttribute("fill", "#7dd3fc"); c1.setAttribute("fill-opacity","0.35");
-  c1.setAttribute("stroke", "#0a2236"); c1.setAttribute("stroke-width","1");
-  svg.appendChild(c1);
-
-  const c2 = make("circle");
-  c2.setAttribute("cx", cx2); c2.setAttribute("cy", cy); c2.setAttribute("r", r2);
-  c2.setAttribute("fill", "#a7f3d0"); c2.setAttribute("fill-opacity","0.35");
-  c2.setAttribute("stroke", "#103321"); c2.setAttribute("stroke-width","1");
-  svg.appendChild(c2);
+  ctx.lineWidth = 2;
+  // A
+  ctx.fillStyle = "rgba(0,127,255,0.18)";
+  ctx.strokeStyle = "rgba(0,127,255,0.55)";
+  ctx.beginPath(); ctx.arc(xA, cy, rA, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  // B
+  ctx.fillStyle = "rgba(0,200,120,0.18)";
+  ctx.strokeStyle = "rgba(0,200,120,0.55)";
+  ctx.beginPath(); ctx.arc(xB, cy, rB, 0, Math.PI*2); ctx.fill(); ctx.stroke();
 
   // labels
-  function addText(x,y,text,anchor="middle"){
-    const t = make("text");
-    t.setAttribute("x", x); t.setAttribute("y", y);
-    t.setAttribute("text-anchor", anchor);
-    t.setAttribute("font-family", "Arial, Helvetica, sans-serif");
-    t.setAttribute("font-size", String(Math.max(12, Math.min(18, Math.round(Math.min(r1,r2)/2)))));
-    t.setAttribute("fill", "#000");
-    svg.appendChild(t);
-    t.textContent = text;
+  ctx.fillStyle = "#e6e6e6";
+  ctx.font = "16px Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  // A label
+  ctx.fillText(`${aName}: ${totA}`, xA - rA*0.55, cy - rA*0.15);
+  // B label
+  ctx.fillText(`${bName}: ${totB}`, xB + rB*0.55, cy - rB*0.15);
+  // overlap label at midpoint of lens
+  const xm = (xA + xB)/2;
+  ctx.fillText(`common: ${common}`, xm, cy);
+
+  // helper lines off to keep style consistent
+  function drawHeading(text){
+    const y = 28;
+    ctx.fillStyle = "#b9c3cf";
+    ctx.font = "20px Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.fillText(text, W/2, y);
   }
-  const fmt = n => isFinite(n) ? n.toLocaleString() : "—";
-
-  // push user labels outside; center common in overlap
-  addText(cx1 - r1 - 10, cy, `${aName}: ${fmt(totA)}`, "end");
-  addText(cx2 + r2 + 10, cy, `${bName}: ${fmt(totB)}`, "start");
-  addText((cx1+cx2)/2, cy + Math.min(r1,r2)*0.2, `common: ${fmt(common)}`);
-
-  if (sum) sum.textContent = `${aName} ${fmt(totA)} · ${bName} ${fmt(totB)} · common ${fmt(common)}`;
+  function drawPanelMessage(text){
+    ctx.fillStyle = "#b9c3cf";
+    ctx.font = "20px Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif";
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.fillText(text, 16, 16 + 32);
+  }
 }
-// --- end Venn Diagram ---------------------------------------------------------
+// --- end Venn Diagram ---
 
 // --- Heatmap ------------------------------------------------------------------
 function drawHeatmap(rows, aName="A", bName="B"){
