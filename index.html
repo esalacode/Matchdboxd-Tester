@@ -571,26 +571,30 @@ function drawVenn(t, aName="A", bName="B"){
   const s = (boxH*0.38) / Math.max(rA, rB); // fit height
   rA *= s; rB *= s;
 
-  // area-per-film scale
-  const areaPer = (rA*rA) / totA;
-  const target = areaPer * common;
+      // target overlap area (π·s² per film)
+  const areaPerFilm = Math.PI * (rA*rA) / totA;
+  const target = areaPerFilm * common;
 
-  // circle–circle intersection area
-  const Aint = (ra, rb, d) => {
-    if (d >= ra + rb) return 0;
-    if (d <= Math.abs(ra - rb)) return Math.PI * Math.min(ra, rb) ** 2;
-    const a1 = Math.acos((d*d + ra*ra - rb*rb)/(2*d*ra));
-    const a2 = Math.acos((d*d + rb*rb - ra*ra)/(2*d*rb));
-    return ra*ra*a1 + rb*rb*a2 - d*ra*Math.sin(a1);
-  };
+  // solve center distance d for target area, with edge cases
+  let d;
+  const minD = Math.abs(rA - rB); // full containment of smaller set
+  const maxD = rA + rB;           // just touching, no overlap
 
-  // solve for center distance d giving target overlap
-  let lo = Math.abs(rA - rB), hi = rA + rB;
-  for (let i=0;i<40;i++){
-    const mid = (lo + hi)/2;
-    (Aint(rA, rB, mid) > target) ? lo = mid : hi = mid;
+  if (common <= 0) {
+    d = maxD;
+  } else if (common >= Math.min(totA, totB)) {
+    d = minD;
+  } else {
+    let lo = minD, hi = maxD;
+    for (let i = 0; i < 40; i++) {
+      const mid = 0.5 * (lo + hi);
+      const ai = Aint(rA, rB, mid);
+      if (ai >= target) lo = mid; else hi = mid;
+    }
+    d = 0.5 * (lo + hi);
   }
-  let d = (lo + hi)/2;
+
+
 
   // fit width if needed
   const span = d + rA + rB;
@@ -626,6 +630,7 @@ function drawVenn(t, aName="A", bName="B"){
   add("text", {x:(xA+xB)/2, y:cy, "text-anchor":"middle", fill:"#000", style:`font:${font}`}).textContent = `common: ${common}`;
 }
 // --- end Venn Diagram ---
+
 
 // --- Heatmap ------------------------------------------------------------------
 function drawHeatmap(rows, aName="A", bName="B"){
