@@ -528,8 +528,8 @@ function gridAndTicks(
   
 // --- Venn Diagram -------------------------------------------------------------
 function computeTotalsUnique(){
-  const A = Array.isArray(lastA) ? lastA : [];
-  const B = Array.isArray(lastB) ? lastB : [];
+  const A = Array.isArray(window.lastA) ? window.lastA : [];
+  const B = Array.isArray(window.lastB) ? window.lastB : [];
   // count ONLY rated films
   const setA = new Set(), setB = new Set();
   for (const it of A) {
@@ -548,13 +548,13 @@ function computeTotalsUnique(){
 }
 
 function _overlapArea(r1, r2, d){
-  if(d >= r1 + r2) return 0;
-  if(d <= Math.abs(r1 - r2)) return Math.PI * Math.min(r1, r2) ** 2;
-  const a1 = Math.acos((d*d + r1*r1 - r2*r2)/(2*d*r1));
-  const a2 = Math.acos((d*d + r2*r2 - r1*r1)/(2*d*r2));
-  return r1*r1*a1 + r2*r2*a2 - 0.5*Math.sqrt(
-    Math.max(0, (-d + r1 + r2)*(d + r1 - r2)*(d - r1 + r2)*(d + r1 + r2))
-  );
+  if (d >= r1 + r2) return 0;
+  if (d <= Math.abs(r1 - r2)) return Math.PI * Math.min(r1, r2) ** 2;
+  const clamp = x => Math.max(-1, Math.min(1, x));
+  const a1 = Math.acos(clamp((d*d + r1*r1 - r2*r2)/(2*d*r1)));
+  const a2 = Math.acos(clamp((d*d + r2*r2 - r1*r1)/(2*d*r2)));
+  const term = (-d + r1 + r2)*(d + r1 - r2)*(d - r1 + r2)*(d + r1 + r2);
+  return r1*r1*a1 + r2*r2*a2 - 0.5*Math.sqrt(Math.max(0, term));
 }
 
 function drawVenn(totals, aName="A", bName="B"){
@@ -576,68 +576,78 @@ function drawVenn(totals, aName="A", bName="B"){
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 
   // area-per-film c, scale to fit width AND height
-let c = 12;
-let r1 = Math.sqrt((c*totA)/Math.PI);
-let r2 = Math.sqrt((c*totB)/Math.PI);
+  let c = 12;
+  let r1 = Math.sqrt((c*totA)/Math.PI);
+  let r2 = Math.sqrt((c*totB)/Math.PI);
 
-const plotW = W - mL - mR;
-const plotH = H - mT - mB;
-let sW = (r1 + r2) > 0 ? plotW / (r1 + r2) : 1;
-let sH = Math.max(r1, r2) > 0 ? (plotH/2) / Math.max(r1, r2) : 1;
-const s = Math.min(1, sW, sH);
-if (s < 1){ r1*=s; r2*=s; c*=s*s; }
+  const plotW = W - mL - mR;
+  const plotH = H - mT - mB;
+  let sW = (r1 + r2) > 0 ? plotW / (r1 + r2) : 1;
+  let sH = Math.max(r1, r2) > 0 ? (plotH*0.8) / (2*Math.max(r1, r2)) : 1; // headroom
+  const s = Math.min(1, sW, sH);
+  if (s < 1){ r1*=s; r2*=s; c*=s*s; }
 
-const target = c * Math.max(0, Math.min(common, Math.min(totA, totB)));
-const maxContain = Math.PI * Math.min(r1, r2) ** 2;
+  // solve distance for target overlap (= common rated)
+  const target = c * Math.max(0, Math.min(common, Math.min(totA, totB)));
+  const maxContain = Math.PI * Math.min(r1, r2) ** 2;
+  let d;
 
-let d;
-if (target <= 0) d = r1 + r2;
-else if (target >= maxContain) d = Math.abs(r1 - r2);
-else {
-  let lo = Math.abs(r1 - r2), hi = r1 + r2;
-  for (let i=0;i<50;i++){
-    const mid = 0.5*(lo+hi);
-    const area = _overlapArea(r1, r2, mid);
-    if (area > target) hi = mid; else lo = mid;
+  if (target <= 0) {
+    d = r1 + r2;                 // disjoint
+  } else if (target >= maxContain) {
+    d = Math.abs(r1 - r2);       // containment
+  } else {
+    let lo = Math.abs(r1 - r2), hi = r1 + r2;
+    for (let i=0; i<80; i++){
+      const mid = 0.5*(lo+hi);
+      const area = _overlapArea(r1, r2, mid);
+      if (area >= target) hi = mid; else lo = mid;
+    }
+    d = Math.min(0.5*(lo+hi), r1 + r2 - 1e-6); // ensure visible overlap
   }
-  d = 0.5*(lo+hi);
+
+  // center horizontally and vertically
+  const span = r1 + d + r2;
+  const cx1 = mL + (plotW - span)/2 + r1;
+  const cx2 = cx1 + d;
+  const cy  = mT + plotH/2;
+
+  const make = n => document.createElementNS("http://www.w3.org/2000/svg", n);
+
+  // circles
+  const c1 = make("circle");
+  c1.setAttribute("cx", cx1); c1.setAttribute("cy", cy); c1.setAttribute("r", r1);
+  c1.setAttribute("fill", "#7dd3fc"); c1.setAttribute("fill-opacity","0.35");
+  c1.setAttribute("stroke", "#0a2236"); c1.setAttribute("stroke-width","1");
+  svg.appendChild(c1);
+
+  const c2 = make("circle");
+  c2.setAttribute("cx", cx2); c2.setAttribute("cy", cy); c2.setAttribute("r", r2);
+  c2.setAttribute("fill", "#a7f3d0"); c2.setAttribute("fill-opacity","0.35");
+  c2.setAttribute("stroke", "#103321"); c2.setAttribute("stroke-width","1");
+  svg.appendChild(c2);
+
+  // labels
+  function addText(x,y,text,anchor="middle"){
+    const t = make("text");
+    t.setAttribute("x", x); t.setAttribute("y", y);
+    t.setAttribute("text-anchor", anchor);
+    t.setAttribute("font-family", "Arial, Helvetica, sans-serif");
+    t.setAttribute("font-size", String(Math.max(12, Math.min(18, Math.round(Math.min(r1,r2)/2)))));
+    t.setAttribute("fill", "#000");
+    svg.appendChild(t);
+    t.textContent = text;
+  }
+  const fmt = n => isFinite(n) ? n.toLocaleString() : "—";
+
+  // push user labels outside; center common in overlap
+  addText(cx1 - r1 - 10, cy, `${aName}: ${fmt(totA)}`, "end");
+  addText(cx2 + r2 + 10, cy, `${bName}: ${fmt(totB)}`, "start");
+  addText((cx1+cx2)/2, cy + Math.min(r1,r2)*0.2, `common: ${fmt(common)}`);
+
+  if (sum) sum.textContent = `${aName} ${fmt(totA)} · ${bName} ${fmt(totB)} · common ${fmt(common)}`;
 }
-
-const cx1 = mL + r1;
-const cx2 = cx1 + d;
-const cy  = mT + plotH/2;
-
-const make = n => document.createElementNS("http://www.w3.org/2000/svg", n);
-
-const c1 = make("circle");
-c1.setAttribute("cx", cx1); c1.setAttribute("cy", cy); c1.setAttribute("r", r1);
-c1.setAttribute("fill", "#7dd3fc"); c1.setAttribute("fill-opacity","0.35");
-c1.setAttribute("stroke", "#000"); c1.setAttribute("stroke-width","1");
-svg.appendChild(c1);
-
-const c2 = make("circle");
-c2.setAttribute("cx", cx2); c2.setAttribute("cy", cy); c2.setAttribute("r", r2);
-c2.setAttribute("fill", "#a7f3d0"); c2.setAttribute("fill-opacity","0.35");
-c2.setAttribute("stroke", "#000"); c2.setAttribute("stroke-width","1");
-svg.appendChild(c2);
-
-function addText(x,y,text,anchor="middle"){
-  const t = make("text");
-  t.setAttribute("x", x); t.setAttribute("y", y);
-  t.setAttribute("text-anchor", anchor);
-  t.setAttribute("font-family", "Arial, Helvetica, sans-serif");
-  t.setAttribute("font-size", "16");
-  t.setAttribute("fill", "#000");
-  svg.appendChild(t);
-  t.textContent = text;
-}
-const fmt = n => isFinite(n) ? n.toLocaleString() : "—";
-addText(cx1 - r1*0.55, cy, `${aName}: ${fmt(totA)}`);
-addText(cx2 + r2*0.55, cy, `${bName}: ${fmt(totB)}`);
-addText((cx1+cx2)/2, cy + 18, `common: ${fmt(common)}`);
-
-if (sum) sum.textContent = `${aName} ${fmt(totA)} · ${bName} ${fmt(totB)} · common ${fmt(common)}`;
-}
+// --- end Venn Diagram ---------------------------------------------------------
 
 // --- Heatmap ------------------------------------------------------------------
 function drawHeatmap(rows, aName="A", bName="B"){
