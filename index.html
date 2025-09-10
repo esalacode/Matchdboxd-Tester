@@ -528,12 +528,23 @@ function gridAndTicks(
   
 // --- Venn Diagram -------------------------------------------------------------
 function computeTotalsUnique(){
+  const A = Array.isArray(lastA) ? lastA : [];
+  const B = Array.isArray(lastB) ? lastB : [];
+  // count ONLY rated films
   const setA = new Set(), setB = new Set();
-  for(const it of lastA){ const k = filmKey(it); if(k) setA.add(k); }
-  for(const it of lastB){ const k = filmKey(it); if(k) setB.add(k); }
+  for (const it of A) {
+    if (typeof it?.rating === "number") {
+      const k = filmKey(it); if (k) setA.add(k);
+    }
+  }
+  for (const it of B) {
+    if (typeof it?.rating === "number") {
+      const k = filmKey(it); if (k) setB.add(k);
+    }
+  }
   let common = 0;
-  for(const k of setA){ if(setB.has(k)) common++; }
-  return {totA: setA.size, totB: setB.size, common};
+  for (const k of setA) if (setB.has(k)) common++;
+  return { totA: setA.size, totB: setB.size, common };
 }
 
 function _overlapArea(r1, r2, d){
@@ -564,35 +575,41 @@ function drawVenn(totals, aName="A", bName="B"){
   const W=600, H=400, mL=40, mR=40, mT=20, mB=30;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
 
-  // area-per-film c, then scale to fit
+  // area-per-film c, scale to fit width AND height
   let c = 12;
   let r1 = Math.sqrt((c*totA)/Math.PI);
   let r2 = Math.sqrt((c*totB)/Math.PI);
-  const maxWidth = W - mL - mR;
-  const sumR = r1 + r2;
-  if(sumR > maxWidth){
-    const s = maxWidth / sumR;
-    r1 *= s; r2 *= s; c *= s*s;
-  }
 
-  let target = c * Math.max(0, Math.min(common, Math.min(totA, totB)));
-  let d;
+  const plotW = W - mL - mR;
+  const plotH = H - mT - mB;
+  // width constraint (two circles laid horizontally)
+  let sW = (r1 + r2) > 0 ? plotW / (r1 + r2) : 1;
+  // height constraint (both circles must fit vertically)
+  let sH = Math.max(r1, r2) > 0 ? (plotH/2) / Math.max(r1, r2) : 1;
+  const s = Math.min(1, sW, sH);
+  if (s < 1){ r1*=s; r2*=s; c*=s*s; }
+
+  // target overlap area = c * common rated films
+  const target = c * Math.max(0, Math.min(common, Math.min(totA, totB)));
+
+  // solve for center distance d (bisection)
   const maxContain = Math.PI * Math.min(r1, r2) ** 2;
-  if(target <= 0){ d = r1 + r2; }
-  else if(target >= maxContain){ d = Math.abs(r1 - r2); }
-  else{
+  let d;
+  if (target <= 0) d = r1 + r2;
+  else if (target >= maxContain) d = Math.abs(r1 - r2);
+  else {
     let lo = Math.abs(r1 - r2), hi = r1 + r2;
-    for(let i=0;i<40;i++){
+    for (let i=0; i<50; i++){
       const mid = 0.5*(lo+hi);
       const area = _overlapArea(r1, r2, mid);
-      if(area > target) hi = mid; else lo = mid;
+      if (area > target) hi = mid; else lo = mid;
     }
     d = 0.5*(lo+hi);
   }
 
   const cx1 = mL + r1;
   const cx2 = cx1 + d;
-  const cy = mT + (H - mT - mB)/2;
+  const cy  = mT + plotH/2;
 
   const make = n => document.createElementNS("http://www.w3.org/2000/svg", n);
 
@@ -615,15 +632,15 @@ function drawVenn(totals, aName="A", bName="B"){
     t.setAttribute("font-family", "Arial, Helvetica, sans-serif");
     t.setAttribute("font-size", "16");
     t.setAttribute("fill", "#000");
-    t.textContent = text;
     svg.appendChild(t);
+    t.textContent = text;
   }
   const fmt = n => isFinite(n) ? n.toLocaleString() : "—";
-  addText(cx1, cy, `${aName}: ${fmt(totA)}`);
-  addText(cx2, cy, `${bName}: ${fmt(totB)}`);
-  addText((cx1+cx2)/2, cy, `common: ${fmt(common)}`);
-
-  if(sum) sum.textContent = `${aName} ${fmt(totA)} · ${bName} ${fmt(totB)} · common ${fmt(common)}`;
+  // move per-user labels away from the overlap to avoid collisions
+  addText(cx1 - r1*0.55, cy, `${aName}: ${fmt(totA)}`);
+  addText(cx2 + r2*0.55, cy, `${bName}: ${fmt(totB)}`);
+  // keep common count centered
+  addText((cx1+cx2)/2, cy + 18, `common: ${fmt(common)}`);
 }
 
 // --- Heatmap ------------------------------------------------------------------
