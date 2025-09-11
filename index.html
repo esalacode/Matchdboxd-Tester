@@ -608,39 +608,29 @@ function drawVenn(t, aName="A", bName="B"){
   const add = (n, attrs) => { const el=document.createElementNS("http://www.w3.org/2000/svg",n);
     for (const k in attrs) el.setAttribute(k, attrs[k]); svg.appendChild(el); return el; };
 
-    // circles (exact colors)
-  // left = #007FFF, right = #bf430b, overlap = #ff1fab
+    // circles Letterboxd-style (solid, no stroke)
   const fillA = "#007FFF", fillB = "#bf430b", fillAB = "#ff1fab";
 
-  // draw base circles (stroked outlines)
-  add("circle",{cx:xA,cy,r:rA, fill:"rgba(0,0,0,0)", stroke:fillA, "stroke-width":"2"});
-  add("circle",{cx:xB,cy,r:rB, fill:"rgba(0,0,0,0)", stroke:fillB, "stroke-width":"2"});
+  // base fills
+  add("circle",{cx:xA, cy, r:rA, fill:fillA});
+  add("circle",{cx:xB, cy, r:rB, fill:fillB});
 
-  // draw fills with low alpha
-  add("circle",{cx:xA,cy,r:rA, fill:fillA, "fill-opacity":"0.18"});
-  add("circle",{cx:xB,cy,r:rB, fill:fillB, "fill-opacity":"0.18"});
-
-  // overlap lens in exact pink
+  // overlap lens in solid pink
   function drawOverlapLens(cx1, r1, cx2, r2, cy, d){
-    if (d >= r1 + r2) return; // no overlap
+    if (d >= r1 + r2) return;
     if (d <= Math.abs(r1 - r2)) {
-      // full containment → fill smaller circle in pink
       const cx = (r1 <= r2) ? cx1 : cx2;
       const rr = Math.min(r1, r2);
-      add("circle",{cx, cy, r: rr, fill: fillAB, "fill-opacity":"0.28"});
+      add("circle",{cx, cy, r: rr, fill: fillAB});
       return;
     }
-    // partial overlap → two-arc lens path
-    const a1 = Math.acos((r1*r1 + d*d - r2*r2)/(2*r1*d));
-    const a2 = Math.acos((r2*r2 + d*d - r1*r1)/(2*r2*d));
-    const p1x = cx1 + r1 * Math.cos(a1);
-    const p1y = cy  - r1 * Math.sin(a1);
-    const p2x = cx1 + r1 * Math.cos(-a1);
-    const p2y = cy  - r1 * Math.sin(-a1);
-    const q1x = cx2 + r2 * Math.cos(Math.PI - a2);
-    const q1y = cy  - r2 * Math.sin(Math.PI - a2);
-    const q2x = cx2 + r2 * Math.cos(-(Math.PI - a2));
-    const q2y = cy  - r2 * Math.sin(-(Math.PI - a2));
+    const a1 = Math.acos((d*d + r1*r1 - r2*r2)/(2*d*r1));
+    const a2 = Math.acos((d*d + r2*r2 - r1*r1)/(2*d*r2));
+
+    const p1x = cx1 + r1 * Math.cos(a1), p1y = cy - r1 * Math.sin(a1);
+    const p2x = cx1 + r1 * Math.cos(-a1), p2y = cy - r1 * Math.sin(-a1);
+    const q1x = cx2 + r2 * Math.cos(Math.PI - a2), q1y = cy - r2 * Math.sin(Math.PI - a2);
+    const q2x = cx2 + r2 * Math.cos(-(Math.PI - a2)), q2y = cy - r2 * Math.sin(-(Math.PI - a2));
 
     const path = [
       `M ${p1x} ${p1y}`,
@@ -649,7 +639,7 @@ function drawVenn(t, aName="A", bName="B"){
       `A ${r1} ${r1} 0 0 0 ${p1x} ${p1y}`,
       "Z"
     ].join(" ");
-    add("path",{d:path, fill:fillAB, "fill-opacity":"0.28"});
+    add("path",{d:path, fill:fillAB});
   }
   drawOverlapLens(xA, rA, xB, rB, cy, d);
 
@@ -657,13 +647,15 @@ function drawVenn(t, aName="A", bName="B"){
   const total = totA + totB - common;
   const pct = v => total ? Math.round((100*v/total)) : 0;
 
-  // labels
-  const font = "13px Arial, Helvetica, sans-serif";
-  add("text",{x:xA - rA*0.50, y:cy - rA*0.15, "text-anchor":"middle", fill:"#000", style:`font:${font}`})
+  // labels (white text for contrast)
+  const font = "bold 14px Arial, Helvetica, sans-serif";
+  const labelColor = "#fff";
+
+  add("text",{x:xA, y:cy, "text-anchor":"middle", fill:labelColor, style:`font:${font}`})
     .textContent = `${aName}: ${totA} (${pct(totA)}%)`;
-  add("text",{x:(xA+xB)/2, y:cy, "text-anchor":"middle", fill:"#000", style:`font:${font}`})
+  add("text",{x:(xA+xB)/2, y:cy, "text-anchor":"middle", fill:labelColor, style:`font:${font}`})
     .textContent = `common: ${common} (${pct(common)}%)`;
-  add("text",{x:xB + rB*0.50, y:cy - rB*0.15, "text-anchor":"middle", fill:"#000", style:`font:${font}`})
+  add("text",{x:xB, y:cy, "text-anchor":"middle", fill:labelColor, style:`font:${font}`})
     .textContent = `${bName}: ${totB} (${pct(totB)}%)`;
 }
 // --- end Venn Diagram ---
