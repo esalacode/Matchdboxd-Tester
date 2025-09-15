@@ -4,10 +4,26 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Matchboxd by eddıe</title>
+  <link rel="preload" href="./assets/fonts/Inter-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./assets/fonts/Inter-Bold.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  @font-face{
+  font-family:"Inter";
+  src:url("./assets/fonts/Inter-Regular.woff2") format("woff2");
+  font-weight:400;
+  font-style:normal;
+  font-display:swap;
+}
+@font-face{
+  font-family:"Inter";
+  src:url("./assets/fonts/Inter-Bold.woff2") format("woff2");
+  font-weight:700;
+  font-style:normal;
+  font-display:swap;
+}
 :root { --bg:#0e141b; --fg:#c8d0d9; --muted:#8fa0ad; --grid:#1f2a35; --accent:#7dd3fc; --accent2:#a7f3d0; }
 * { box-sizing: border-box; }
-body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--fg);}
+body { margin:0; font-family:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background:var(--bg); color:var(--fg);}
 header { padding:16px; border-bottom:1px solid var(--grid); display:flex; align-items:center; justify-content:space-between; gap:12px;}
 header h1 { font-size:18px; margin:0;}
 .top-actions { display:flex; gap:8px; align-items:center; }
@@ -30,13 +46,13 @@ footer{ color:#6a7b89; text-align:center; font-size:12px; padding:12px 0 32px;}
 
 /* SVGs – APA Style */
 .svg { width:100%; height:420px; display:block; background:#ffffff; }
-.tick text { fill:#000000; font-size:13px; font-family: Arial, Helvetica, sans-serif; }
+.tick text { fill:#000000; font-size:13px; font-family:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
 .gridline{ stroke:#cccccc; stroke-width:1; }
 .diag{ stroke:#666666; stroke-dasharray:4 4; }
 .tooltip{ position:absolute; pointer-events:none; transform:translate(-50%, -120%);
   background:#ffffff; border:1px solid #999; border-radius:4px;
   padding:6px 8px; font-size:12px; color:#000000;
-  font-family: Arial, Helvetica, sans-serif;
+    font-family:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.15); display:none; }
 #heatWrap, #histWrap { position:relative; width:100%; }
 .legend {
@@ -46,7 +62,7 @@ footer{ color:#6a7b89; text-align:center; font-size:12px; padding:12px 0 32px;}
   align-items:center;
   font-size:12px;
   color:#000000;
-  font-family: Arial, Helvetica, sans-serif;
+    font-family:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   margin-top:8px;
 }
 .swatch { width:12px; height:12px; border-radius:2px; }
@@ -667,8 +683,8 @@ function drawVenn(t, aName="A", bName="B"){
 
   const fontNumPx  = Math.max(12, Math.min(18, Math.round(Math.min(rA, rB) * 0.22)));
   const fontNamePx = Math.max(12, Math.min(16, Math.round(Math.min(rA, rB) * 0.18)));
-  const fontNum  = `normal ${fontNumPx}px Arial, Helvetica, sans-serif`;   // numbers (223, 110, 509)
-const fontName = `normal ${fontNamePx}px Arial, Helvetica, sans-serif`;  // user labels
+    const fontNum  = `${fontNumPx}px "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;  // numbers (223, 110, 509)
+    const fontName = `${fontNamePx}px "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;  // user labels
 
   const txt = (attrs, s) => { const t = add("text", attrs); t.textContent = s; return t; };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
