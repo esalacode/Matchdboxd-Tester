@@ -18,11 +18,12 @@ function normUser(u){
 function parseDiaryPage(html){
   const $ = cheerio.load(html);
   const items = [];
-  const sel = "tr.diary-entry-row time[datetime], li.diary-entry time[datetime], article.diary-entry time[datetime]";
-  $(sel).each((_, el) => {
-    const dt = $(el).attr("datetime");
-    if (!dt || !/^\d{4}-\d{2}-\d{2}/.test(dt)) return;
-    items.push({ yearLogged: +dt.slice(0,4), logged: dt });
+  // Be liberal: grab ISO dates from any diary row (<tr>|<li>|<article>) time tags
+  $("tr time[datetime], li time[datetime], article time[datetime]").each((_, el) => {
+    const dt = ($(el).attr("datetime") || "").trim();
+    const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return;
+    items.push({ yearLogged: +m[1], logged: dt.slice(0,10) });
   });
   return items;
 }
