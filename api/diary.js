@@ -15,85 +15,36 @@ function normUser(u){
   return /^[a-z0-9_-]{1,30}$/i.test(u) ? u : null;
 }
 
-//function parseDiaryPage(html){
-//  const $ = cheerio.load(html);
-//  const items = [];
-//  // Be liberal: grab ISO dates from any diary row (<tr>|<li>|<article>) time tags
-//  $("tr time[datetime], li time[datetime], article time[datetime]").each((_, el) => {
-//    const dt = ($(el).attr("datetime") || "").trim();
-//    const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})/);
-//    if (!m) return;
-//    items.push({ yearLogged: +m[1], logged: dt.slice(0,10) });
-//  });
-//  return items;
-//}
-
 function parseDiaryPage(html){
   const $ = cheerio.load(html);
   const items = [];
-  const MONTH = {
-    january:"01", february:"02", march:"03", april:"04", may:"05", june:"06",
-    july:"07", august:"08", september:"09", october:"10", november:"11", december:"12"
-  };
-
-  $("tr.diary-entry-row, li.diary-entry, article.diary-entry").each((_, row) => {
-    // 1) <time datetime="YYYY-MM-DD">
-    let dt = ($(row).find("time[datetime]").attr("datetime") || "").trim();
-
-    // 2) Link like /diary/2025/may/16/ → build YYYY-MM-DD
-    if (!dt) {
-      const href = ($(row).find("a[href*='/diary/']").attr("href") || "");
-      const m = href.match(/\/diary\/(\d{4})\/([a-z]+)\/(\d{1,2})\//i);
-      if (m) {
-        const y = m[1];
-        const mm = MONTH[(m[2]||"").toLowerCase()];
-        const dd = String(+m[3]).padStart(2,"0");
-        if (mm) dt = `${y}-${mm}-${dd}`;
-      }
-    }
-
-    // 3) Last resort: any ISO date text inside the row
-    if (!dt) {
-      const m = ($(row).text() || "").match(/\b(19|20)\d{2}-\d{2}-\d{2}\b/);
-      if (m) dt = m[0];
-    }
-
-    const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return;
-    items.push({ yearLogged: +m[1], logged: dt.slice(0,10) });
+  const sel = "tr.diary-entry-row time[datetime], li.diary-entry time[datetime], article.diary-entry time[datetime]";
+  $(sel).each((_, el) => {
+    const dt = $(el).attr("datetime");
+    if (!dt || !/^\d{4}-\d{2}-\d{2}/.test(dt)) return;
+    items.push({ yearLogged: +dt.slice(0,4), logged: dt });
   });
-
   return items;
-}
-
-async function fetchDiaryPage(user, page){
-  const base = `https://letterboxd.com/${user}/films/diary/`;
-  const url = page>1 ? `${base}page/${page}/` : base;
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": ua(),
-      "Accept": "text/html,application/xhtml+xml",
-      "Accept-Language": "en-US,en;q=0.9"
-    },
-    redirect: "follow"
-  });
-  if(!res.ok) return { ok:false, status:res.status, url };
-  const html = await res.text();
-  return { ok:true, html, url };
 }
 
 module.exports = async (req, res) => {
   try{
     const user = normUser(req.query.user);
-    const maxPages = Math.max(1, Math.min(300, +(req.query.maxPages||200)));
-    if(!user) return res.status(400).json({ error:"bad user" });
+    const maxPages = Math.max(1, Math.min(500, +(req.query.maxPages || 50)));
+    if(!user){ res.status(400).json({ error:"invalid user" }); return; }
 
     const all = [];
-    for(let p=1; p<=maxPages; p++){
-      const r = await fetchDiaryPage(user, p);
-      if(!r.ok) break;
-      const items = parseDiaryPage(r.html);
-      if(items.length===0) break;
+    const base = `https://letterboxd.com/${encodeURIComponent(user)}/films/diary/`;
+    for (let page=1; page<=maxPages; page++){
+      const url = page===1 ? base : `${base}page/${page}/`;
+      const r = await fetch(url, { headers: { "User-Agent": ua(), "Accept": "text/html,*/*" }});
+      if (!r.ok){
+        if (page === 1) { res.status(r.status).json({ error:`fetch failed`, status:r.status, url }); return; }
+        break;
+      }
+      const html = await r.text();
+      const items = parseDiaryPage(html);
+      if (items.length === 0) break;
       all.push(...items);
       await sleep(400);
     }
