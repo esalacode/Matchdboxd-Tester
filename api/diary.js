@@ -18,38 +18,35 @@ function normUser(u){
 function parseDiaryPage(html){
   const $ = cheerio.load(html);
   const items = [];
-  // Works for table + card layouts
-  $("[id^=diary-entry], .diary-entry-row, li, tr").each((_,el)=>{
-    const $el = $(el);
+
+  // TABLE layout
+  $("tr.diary-entry-row").each((_, el) => {
+    const dt = $(el).find("time[datetime]").attr("datetime");
+    if (!dt) return;                       // skip rows with no logged date
+    const y = +dt.slice(0,4);
     const title =
-      $el.find("[data-film-name]").attr("data-film-name") ||
-      $el.find("img[alt]").attr("alt") || "";
-    if(!title) return;
-
-    // Prefer machine date
-    let logged = $el.find("time[datetime]").attr("datetime") || "";
-    // Fallback: any YYYY in row text
-    let year = null;
-    if (logged) {
-      const m = logged.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (m) year = +m[1];
-    }
-    if (!year) {
-      const ym = ($el.text()||"").match(/\b(19|20)\d{2}\b/);
-      if (ym) year = +ym[0];
-    }
-    if(!year) return;
-
-    // Slug if available
-    let slug = $el.find("[data-film-slug]").attr("data-film-slug") || null;
-    if(!slug){
-      const href = $el.find('a[href*="/film/"]').attr("href") || "";
-      const m = href.match(/\/film\/([^/]+)/);
-      if(m) slug = m[1];
-    }
-
-    items.push({ title, slug, yearLogged: year, logged });
+      $(el).find("[data-film-name]").attr("data-film-name") ||
+      $(el).find("a[href*='/film/']").attr("data-original-title") || "";
+    if (!title) return;
+    const href = $(el).find("a[href*='/film/']").attr("href") || "";
+    const slug = (href.match(/\/film\/([^/]+)/)||[])[1] || null;
+    items.push({ title, slug, yearLogged: y, logged: dt });
   });
+
+  // CARD (mobile) layout
+  $("li.diary-entry, li[data-film-slug]").each((_, el) => {
+    const dt = $(el).find("time[datetime]").attr("datetime");
+    if (!dt) return;
+    const y = +dt.slice(0,4);
+    const title =
+      $(el).find("[data-film-name]").attr("data-film-name") ||
+      $(el).find("img[alt]").attr("alt") || "";
+    if (!title) return;
+    const slug = $(el).attr("data-film-slug") ||
+      (($(el).find("a[href*='/film/']").attr("href")||"").match(/\/film\/([^/]+)/)||[])[1] || null;
+    items.push({ title, slug, yearLogged: y, logged: dt });
+  });
+
   return items;
 }
 
