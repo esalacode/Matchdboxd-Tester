@@ -18,35 +18,12 @@ function normUser(u){
 function parseDiaryPage(html){
   const $ = cheerio.load(html);
   const items = [];
-
-  // TABLE layout
-  $("tr.diary-entry-row").each((_, el) => {
-    const dt = $(el).find("time[datetime]").attr("datetime");
-    if (!dt) return;                       // skip rows with no logged date
-    const y = +dt.slice(0,4);
-    const title =
-      $(el).find("[data-film-name]").attr("data-film-name") ||
-      $(el).find("a[href*='/film/']").attr("data-original-title") || "";
-    if (!title) return;
-    const href = $(el).find("a[href*='/film/']").attr("href") || "";
-    const slug = (href.match(/\/film\/([^/]+)/)||[])[1] || null;
-    items.push({ title, slug, yearLogged: y, logged: dt });
+  const sel = "tr.diary-entry-row time[datetime], li.diary-entry time[datetime], article.diary-entry time[datetime]";
+  $(sel).each((_, el) => {
+    const dt = $(el).attr("datetime");
+    if (!dt || !/^\d{4}-\d{2}-\d{2}/.test(dt)) return;
+    items.push({ yearLogged: +dt.slice(0,4), logged: dt });
   });
-
-  // CARD (mobile) layout
-  $("li.diary-entry, li[data-film-slug]").each((_, el) => {
-    const dt = $(el).find("time[datetime]").attr("datetime");
-    if (!dt) return;
-    const y = +dt.slice(0,4);
-    const title =
-      $(el).find("[data-film-name]").attr("data-film-name") ||
-      $(el).find("img[alt]").attr("alt") || "";
-    if (!title) return;
-    const slug = $(el).attr("data-film-slug") ||
-      (($(el).find("a[href*='/film/']").attr("href")||"").match(/\/film\/([^/]+)/)||[])[1] || null;
-    items.push({ title, slug, yearLogged: y, logged: dt });
-  });
-
   return items;
 }
 
