@@ -995,9 +995,9 @@ async function runBoth(){
   showLoadingBar();
   try{
     const [a, b, da, db] = await Promise.all([
-      fetchRatings(uA), fetchRatings(uB),
-      fetchDiary(uA),   fetchDiary(uB)
-    ]);
+  fetchRatings(uA), fetchRatings(uB),
+  fetchDiary(uA, 200), fetchDiary(uB, 200)
+]);
     lastA = a.items || [];
     lastB = b.items || [];
     diaryA = da || null;
