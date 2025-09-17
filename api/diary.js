@@ -15,16 +15,54 @@ function normUser(u){
   return /^[a-z0-9_-]{1,30}$/i.test(u) ? u : null;
 }
 
+//function parseDiaryPage(html){
+//  const $ = cheerio.load(html);
+//  const items = [];
+//  // Be liberal: grab ISO dates from any diary row (<tr>|<li>|<article>) time tags
+//  $("tr time[datetime], li time[datetime], article time[datetime]").each((_, el) => {
+//    const dt = ($(el).attr("datetime") || "").trim();
+//    const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})/);
+//    if (!m) return;
+//    items.push({ yearLogged: +m[1], logged: dt.slice(0,10) });
+//  });
+//  return items;
+//}
+
 function parseDiaryPage(html){
   const $ = cheerio.load(html);
   const items = [];
-  // Be liberal: grab ISO dates from any diary row (<tr>|<li>|<article>) time tags
-  $("tr time[datetime], li time[datetime], article time[datetime]").each((_, el) => {
-    const dt = ($(el).attr("datetime") || "").trim();
+  const MONTH = {
+    january:"01", february:"02", march:"03", april:"04", may:"05", june:"06",
+    july:"07", august:"08", september:"09", october:"10", november:"11", december:"12"
+  };
+
+  $("tr.diary-entry-row, li.diary-entry, article.diary-entry").each((_, row) => {
+    // 1) <time datetime="YYYY-MM-DD">
+    let dt = ($(row).find("time[datetime]").attr("datetime") || "").trim();
+
+    // 2) Link like /diary/2025/may/16/ → build YYYY-MM-DD
+    if (!dt) {
+      const href = ($(row).find("a[href*='/diary/']").attr("href") || "");
+      const m = href.match(/\/diary\/(\d{4})\/([a-z]+)\/(\d{1,2})\//i);
+      if (m) {
+        const y = m[1];
+        const mm = MONTH[(m[2]||"").toLowerCase()];
+        const dd = String(+m[3]).padStart(2,"0");
+        if (mm) dt = `${y}-${mm}-${dd}`;
+      }
+    }
+
+    // 3) Last resort: any ISO date text inside the row
+    if (!dt) {
+      const m = ($(row).text() || "").match(/\b(19|20)\d{2}-\d{2}-\d{2}\b/);
+      if (m) dt = m[0];
+    }
+
     const m = dt.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (!m) return;
     items.push({ yearLogged: +m[1], logged: dt.slice(0,10) });
   });
+
   return items;
 }
 
