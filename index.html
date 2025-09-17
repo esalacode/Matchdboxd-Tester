@@ -1019,11 +1019,12 @@ $("#userA").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDef
 $("#userB").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
   function renderByYear(){
   const s = $("#statusY"), sum = $("#summaryY");
-  if(!diaryA || !diaryB){
-    setStatus(s,"Fetch both to see yearly logs."); sum.textContent="";
-    $("#yearA").innerHTML=""; $("#yearB").innerHTML="";
-    return;
-  }
+  if(!diaryA || !diaryB || !diaryA.years || !diaryB.years ||
+   Object.keys(diaryA.years).length===0 || Object.keys(diaryB.years).length===0){
+  setStatus(s,"No diary logs found."); sum.textContent="";
+  $("#yearA").innerHTML=""; $("#yearB").innerHTML="";
+  return;
+}
   setStatus(s,""); sum.textContent = "Films logged per year";
   drawYearBars($("#yearA"), diaryA.years, ($("#userA").value||"A").trim()||"A");
   drawYearBars($("#yearB"), diaryB.years, ($("#userB").value||"B").trim()||"B");
