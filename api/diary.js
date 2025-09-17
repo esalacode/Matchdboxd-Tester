@@ -69,7 +69,7 @@ async function fetchDiaryPage(user, page){
 module.exports = async (req, res) => {
   try{
     const user = normUser(req.query.user);
-    const maxPages = Math.max(1, Math.min(100, +(req.query.maxPages||50)));
+    const maxPages = Math.max(1, Math.min(300, +(req.query.maxPages||200)));
     if(!user) return res.status(400).json({ error:"bad user" });
 
     const all = [];
