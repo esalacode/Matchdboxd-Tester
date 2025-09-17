@@ -90,6 +90,11 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 }
 @keyframes lb-sweep{ 0%{ left:-20%; } 100%{ left:100%; } }
   #panelD .stats-lines div{ margin-top:4px; }
+
+/* By-Year bars */
+.year-svg { width:100%; height:220px; }
+.bar:hover { opacity:.9 }
+
 </style>
 </head>
 <body>
@@ -107,6 +112,17 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
   <div class="loading-bar-indeterminate"></div>
 </div>
 <div class="grid">
+
+  <!-- By Year panel -->
+<section class="card" id="panelY">
+  <div class="row" style="justify-content:space-between; align-items:center">
+    <label>By Year</label>
+    <div class="small" id="summaryY"></div>
+  </div>
+  <div id="statusY" class="status"></div>
+  <svg id="yearA" class="svg year-svg" viewBox="0 0 1200 220" aria-label="User A by year"></svg>
+  <svg id="yearB" class="svg year-svg" viewBox="0 0 1200 220" aria-label="User B by year" style="margin-top:12px"></svg>
+</section>
 
 <!-- Venn Diagram panel -->
 <section class="card" id="panelV">
@@ -198,10 +214,17 @@ async function fetchRatings(user){
   const res = await fetch(`/api/ratings?user=${encodeURIComponent(user)}`, {headers:{Accept:"application/json"}});
   if(!res.ok) throw new Error(`API ${res.status}`); return res.json();
 }
+  async function fetchDiary(user, maxPages=50){
+  const r = await fetch(`/api/diary?user=${encodeURIComponent(user)}&maxPages=${maxPages}`);
+  if(!r.ok) throw new Error(`Diary fetch failed for ${user}`);
+  return r.json();
+}
 function setStatus(el,msg,isErr=false){ el.textContent = msg||""; el.style.color = isErr ? "#ffb3b3" : "#8fa0ad"; }
 
 // --- Shared state + overlap ---------------------------------------------------
 let lastA = [], lastB = [];
+  let lastA = [], lastB = [];
+let diaryA = null, diaryB = null; // per-year counts for each user
 
 // Unique identity key for a film: prefer slug, then url, then title+year
 const filmKey = it => {
@@ -959,8 +982,9 @@ function updateAllViews(){
   const bName = ($("#userB").value || "B").trim() || "B";
   drawVenn(computeTotalsUnique(), aName, bName);
   drawHeatmap(rows, aName, bName);
-  drawHistogram(rows, aName, bName);
-  renderDescriptiveStats(); 
+    drawHistogram(rows, aName, bName);
+  renderDescriptiveStats();
+  renderByYear();
 }
 
 async function runBoth(){
@@ -971,7 +995,12 @@ async function runBoth(){
   
   showLoadingBar();
   try{
-    const [a, b] = await Promise.all([fetchRatings(uA), fetchRatings(uB)]);
+    const [a, b, da, db] = await Promise.all([
+  fetchRatings(uA), fetchRatings(uB),
+  fetchDiary(uA),   fetchDiary(uB)
+]);
+lastA = a.items || [];  lastB = b.items || [];
+diaryA = da || null;    diaryB = db || null;
     lastA = a.items || [];
     lastB = b.items || [];
     setStatus(status,"");
@@ -987,6 +1016,78 @@ async function runBoth(){
 
 $("#userA").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
 $("#userB").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
+  function renderByYear(){
+  const s = $("#statusY"), sum = $("#summaryY");
+  if(!diaryA || !diaryB){
+    setStatus(s,"Fetch both to see yearly logs."); sum.textContent="";
+    $("#yearA").innerHTML=""; $("#yearB").innerHTML="";
+    return;
+  }
+  setStatus(s,""); sum.textContent = "Films logged per year";
+  drawYearBars($("#yearA"), diaryA.years, ($("#userA").value||"A").trim()||"A");
+  drawYearBars($("#yearB"), diaryB.years, ($("#userB").value||"B").trim()||"B");
+}
+
+function drawYearBars(svgEl, yearCounts, label){
+  const svgNS="http://www.w3.org/2000/svg";
+  const W=1200, H=220, padL=56, padR=24, padT=24, padB=36;
+  const innerW=W-padL-padR, innerH=H-padT-padB;
+
+  const years = Object.keys(yearCounts||{}).map(x=>+x).sort((a,b)=>a-b);
+  if(years.length===0){ svgEl.innerHTML=""; return; }
+  const yMin = years[0], yMax = years[years.length-1];
+  const xs = (y)=> padL + ( (y - yMin) / Math.max(1,(yMax-yMin)) ) * innerW;
+  const maxCnt = Math.max(...years.map(y=>yearCounts[y]||0));
+  const ys = (c)=> padT + innerH - (c/maxCnt)*innerH;
+
+  svgEl.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svgEl.innerHTML = "";
+
+  const gAxis = document.createElementNS(svgNS,"g");
+  const base = document.createElementNS(svgNS,"line");
+  base.setAttribute("x1", padL); base.setAttribute("x2", padL+innerW);
+  base.setAttribute("y1", padT+innerH); base.setAttribute("y2", padT+innerH);
+  base.setAttribute("stroke", "var(--grid)");
+  gAxis.appendChild(base);
+
+  for(const y of [yMin, yMax]){
+    const tx = document.createElementNS(svgNS,"text");
+    tx.setAttribute("x", xs(y));
+    tx.setAttribute("y", H-8);
+    tx.setAttribute("text-anchor", y===yMin?"start":"end");
+    tx.setAttribute("fill","var(--muted)");
+    tx.setAttribute("style","font:12px Inter, system-ui");
+    tx.textContent = y;
+    gAxis.appendChild(tx);
+  }
+  svgEl.appendChild(gAxis);
+
+  const bw = Math.max(6, innerW / Math.max(1, years.length) * 0.9);
+  for(const y of years){
+    const c = yearCounts[y]||0;
+    const x = xs(y) - bw/2;
+    const rect = document.createElementNS(svgNS,"rect");
+    rect.setAttribute("class","bar");
+    rect.setAttribute("x", x);
+    rect.setAttribute("y", ys(c));
+    rect.setAttribute("width", bw);
+    rect.setAttribute("height", Math.max(0, padT+innerH - ys(c)));
+    rect.setAttribute("rx","3");
+    rect.setAttribute("fill","var(--accent2)");
+    rect.setAttribute("opacity","0.95");
+    rect.appendChild(document.createElementNS(svgNS,"title"))
+         .textContent = `${c} films\nLogged in ${y}`;
+    svgEl.appendChild(rect);
+  }
+
+  const chip = document.createElementNS(svgNS,"text");
+  chip.setAttribute("x", 56);
+  chip.setAttribute("y", 16);
+  chip.setAttribute("fill","var(--muted)");
+  chip.setAttribute("style","font:12px Inter, system-ui");
+  chip.textContent = label;
+  svgEl.appendChild(chip);
+}
 </script>
 </body>
 </html>
