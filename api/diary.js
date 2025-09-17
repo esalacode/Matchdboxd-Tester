@@ -73,11 +73,35 @@ async function countYear(user, year) {
   return total;
 }
 
-function parseRange(qsNow) {
+// Discover actual diary years from the archive page
+async function fetchDiaryYears(user) {
+  const url = `https://letterboxd.com/${encodeURIComponent(user)}/films/diary/`;
+  const html = await getHTML(url, 1);
+  if (BLOCK_RE.test(html)) return []; // fallback handled by resolver
+  const $ = cheerio.load(html);
+  const set = new Set();
+  $('a[href*="/films/diary/for/"]').each((_, a) => {
+    const href = String($(a).attr("href") || "");
+    const m = href.match(/\/for\/(\d{4})\//);
+    if (m) set.add(+m[1]);
+  });
+  return Array.from(set).sort((a, b) => a - b);
+}
+
+// Resolve [from..to] using discovered years, clamping any query params
+async function resolveYearRange(user, q) {
   const nowY = new Date().getFullYear();
-  const from = Number.isInteger(+qsNow.from) ? +qsNow.from : Math.min(2011, nowY); // LB launched 2011
-  const to = Number.isInteger(+qsNow.to) ? +qsNow.to : nowY;
-  return [Math.min(from, to), Math.max(from, to)];
+  const years = await fetchDiaryYears(user);
+  const minY = years.length ? years[0] : 2011;
+  const maxY = years.length ? years[years.length - 1] : nowY;
+
+  let from = Number.isInteger(+q.from) ? +q.from : minY;
+  let to   = Number.isInteger(+q.to)   ? +q.to   : maxY;
+  if (from > to) [from, to] = [to, from];
+
+  from = Math.max(minY, Math.min(from, maxY));
+  to   = Math.max(minY, Math.min(to,   maxY));
+  return [from, to];
 }
 
 async function buildYears(user, from, to) {
@@ -102,7 +126,7 @@ module.exports = async function diary(req, res) {
       res.status(400).json({ error: "Missing ?user" });
       return;
     }
-    const [from, to] = parseRange(q);
+    const [from, to] = await resolveYearRange(user, q);
     const years = await buildYears(user, from, to);
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({ user, years });
