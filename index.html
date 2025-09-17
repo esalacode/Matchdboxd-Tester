@@ -223,7 +223,6 @@ function setStatus(el,msg,isErr=false){ el.textContent = msg||""; el.style.color
 
 // --- Shared state + overlap ---------------------------------------------------
 let lastA = [], lastB = [];
-  let lastA = [], lastB = [];
 let diaryA = null, diaryB = null; // per-year counts for each user
 
 // Unique identity key for a film: prefer slug, then url, then title+year
@@ -992,25 +991,27 @@ async function runBoth(){
   const uA = normUser($("#userA").value);
   const uB = normUser($("#userB").value);
   if(!uA || !uB){ setStatus(status,"Enter two valid usernames.", true); return; }
-  
+
   showLoadingBar();
   try{
     const [a, b, da, db] = await Promise.all([
-  fetchRatings(uA), fetchRatings(uB),
-  fetchDiary(uA),   fetchDiary(uB)
-]);
-lastA = a.items || [];  lastB = b.items || [];
-diaryA = da || null;    diaryB = db || null;
+      fetchRatings(uA), fetchRatings(uB),
+      fetchDiary(uA),   fetchDiary(uB)
+    ]);
     lastA = a.items || [];
     lastB = b.items || [];
+    diaryA = da || null;
+    diaryB = db || null;
+
     setStatus(status,"");
     updateAllViews();
-    hideLoadingBar();
-  }catch(e){
+  } catch(e){
     setStatus(status, e.message || String(e), true);
-    hideLoadingBar();
     lastA = []; lastB = [];
+    diaryA = null; diaryB = null;
     updateAllViews();
+  } finally {
+    hideLoadingBar();
   }
 }
 
