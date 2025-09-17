@@ -1017,18 +1017,34 @@ async function runBoth(){
 
 $("#userA").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
 $("#userB").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
-  function renderByYear(){
+ 
+function renderByYear(){
   const s = $("#statusY"), sum = $("#summaryY");
-  if(!diaryA || !diaryB || !diaryA.years || !diaryB.years ||
-   Object.keys(diaryA.years).length===0 || Object.keys(diaryB.years).length===0){
-  setStatus(s,"No diary logs found."); sum.textContent="";
-  $("#yearA").innerHTML=""; $("#yearB").innerHTML="";
-  return;
+  const hasA = !!(diaryA && diaryA.years && Object.keys(diaryA.years).length);
+  const hasB = !!(diaryB && diaryB.years && Object.keys(diaryB.years).length);
+
+  if (!hasA && !hasB){
+    setStatus(s,"No diary logs found."); 
+    sum.textContent="";
+    $("#yearA").innerHTML=""; 
+    $("#yearB").innerHTML="";
+    return;
+  }
+
+  setStatus(s,"");
+  sum.textContent = "Films logged per year";
+  if (hasA) {
+    drawYearBars($("#yearA"), diaryA.years, ($("#userA").value||"A").trim()||"A");
+  } else {
+    $("#yearA").innerHTML="";
+  }
+  if (hasB) {
+    drawYearBars($("#yearB"), diaryB.years, ($("#userB").value||"B").trim()||"B");
+  } else {
+    $("#yearB").innerHTML="";
+  }
 }
-  setStatus(s,""); sum.textContent = "Films logged per year";
-  drawYearBars($("#yearA"), diaryA.years, ($("#userA").value||"A").trim()||"A");
-  drawYearBars($("#yearB"), diaryB.years, ($("#userB").value||"B").trim()||"B");
-}
+
 
 function drawYearBars(svgEl, yearCounts, label){
   const svgNS="http://www.w3.org/2000/svg";
