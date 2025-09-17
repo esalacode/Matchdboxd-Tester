@@ -1,91 +1,115 @@
-// /api/diary?user=<username>&from=1990&to=2030
+// /api/diary.js
+// Node 18+ (built-in fetch). Install: npm i cheerio
 const cheerio = require("cheerio");
 
-const H = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
-  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Pragma": "no-cache",
-  "Cache-Control": "no-cache",
-  "Referer": "https://letterboxd.com/"
-};
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-const blocked = t => /cloudflare|just a moment|attention required/i.test(t || "");
+const UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
+const BLOCK_RE = /(Just a moment|Attention Required|cloudflare|Please enable cookies)/i;
+const SEL =
+  "tr.diary-entry-row time[datetime], li.diary-entry time[datetime], article.diary-entry time[datetime]";
+const MAX_PAGES = 60; // safety
 
-function normUser(u){
-  if(!u) return null;
-  u = String(u).trim().replace(/^@/,"").toLowerCase();
-  return /^[a-z0-9_-]{1,30}$/i.test(u) ? u : null;
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function getHTML(url, retry = 1) {
+  const res = await fetch(url, {
+    headers: {
+      "user-agent": UA,
+      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "accept-language": "en-US,en;q=0.7",
+      "cache-control": "no-cache",
+    },
+  });
+  const html = await res.text();
+  if (BLOCK_RE.test(html) && retry > 0) {
+    await sleep(600 + Math.random() * 600);
+    return getHTML(url, retry - 1);
+  }
+  return html;
 }
 
-async function fetchText(url){
-  const r = await fetch(url, { headers: H });
-  if (!r.ok) return null;
-  return r.text();
+function headerCount(html, year) {
+  // Examples: “Gage has logged 124 entries for films during 2025.”
+  const text = cheerio.load(html)("body").text().replace(/\s+/g, " ");
+  const m = new RegExp(
+    `has\\s+logged\\s+([\\d,]+)\\s+entries\\s+for\\s+films\\s+during\\s+${year}`,
+    "i"
+  ).exec(text);
+  return m ? parseInt(m[1].replace(/,/g, ""), 10) : null;
 }
 
-function headerCount(html, y){
-  const m = (html||"").match(new RegExp(`logged\\s+(\\d+)\\s+entries\\s+for\\s+films\\s+during\\s+${y}`, "i"));
-  return m ? +m[1] : null;
-}
-
-function countTimes(html, y){
-  const $ = cheerio.load(html||"");
+function pageYearMatches(html, year) {
+  const $ = cheerio.load(html);
   let n = 0;
-  $("time[datetime]").each((_, el) => {
-    const dt = $(el).attr("datetime") || "";
-    if (dt.startsWith(String(y))) n++;
+  $(SEL).each((_, el) => {
+    const dt = ($(el).attr("datetime") || "").slice(0, 4);
+    if (dt === String(year)) n++;
   });
   return n;
 }
 
-async function countYear(user, y){
-  const base = `https://letterboxd.com/${encodeURIComponent(user)}/films/diary/for/${y}/`;
+async function countYear(user, year) {
+  // 1) Try header (1 request)
+  const base = `https://letterboxd.com/${encodeURIComponent(user)}/films/diary/for/${year}/`;
+  let html = await getHTML(base, 1);
+  let fromHeader = headerCount(html, year);
+  if (Number.isInteger(fromHeader)) return fromHeader;
 
-  let html = await fetchText(base);
-  if (!html || blocked(html)) return {count:0, blocked:true};
-
-  const hdr = headerCount(html, y);
-  if (hdr != null) return {count: hdr, blocked:false};
-
-  // Fallback: paginate that year completely
-  let total = 0, page = 1;
-  while (true){
+  // 2) Paginate and count <time datetime> (page/2, page/3, …) until zero matches
+  let total = 0;
+  for (let page = 1; page <= MAX_PAGES; page++) {
     const url = page === 1 ? base : `${base}page/${page}/`;
-    if (page > 1){ html = await fetchText(url); if (!html) break; if (blocked(html)) return {count:total, blocked:true}; }
-    const n = countTimes(html, y);
-    if (n === 0) break;
-    total += n;
-    page++;
-    if (page > 300) break;
-    await sleep(250);
+    html = await getHTML(url, 1);
+    if (BLOCK_RE.test(html)) {
+      // skip this year if blocked after retry
+      break;
+    }
+    const hits = pageYearMatches(html, year);
+    if (hits === 0) break;
+    total += hits;
+    // be polite to CF
+    await sleep(200 + Math.random() * 300);
   }
-  return {count: total, blocked:false};
+  return total;
 }
 
-module.exports = async (req, res) => {
-  try{
-    const user = normUser(req.query.user);
-    if (!user) return res.status(400).json({ error:"invalid user" });
+function parseRange(qsNow) {
+  const nowY = new Date().getFullYear();
+  const from = Number.isInteger(+qsNow.from) ? +qsNow.from : Math.min(2011, nowY); // LB launched 2011
+  const to = Number.isInteger(+qsNow.to) ? +qsNow.to : nowY;
+  return [Math.min(from, to), Math.max(from, to)];
+}
 
-    const now  = new Date().getFullYear();
-    const to   = Math.min(now, +(req.query.to || now));
-    const from = Math.max(1950, +(req.query.from || (to - 30)));
-
-    const years = {};
-    let sawBlock = false;
-
-    for (let y = to; y >= from; y--){
-      const {count, blocked:blk} = await countYear(user, y);
-      if (blk) sawBlock = true;
-      if (count > 0) years[y] = count;
-      await sleep(150);
+async function buildYears(user, from, to) {
+  const years = {};
+  for (let y = from; y <= to; y++) {
+    try {
+      years[y] = await countYear(user, y);
+    } catch {
+      years[y] = 0; // hard fail -> zero for that year
     }
+    await sleep(150 + Math.random() * 200);
+  }
+  return years;
+}
 
-    res.setHeader("Cache-Control","no-store");
-    res.status(200).json({ user, years, blocked: sawBlock });
-  }catch(e){
+// Works for Express (req,res) and Next.js API routes.
+module.exports = async function diary(req, res) {
+  try {
+    const q = req.query || {};
+    const user = (q.user || "").trim();
+    if (!user) {
+      res.status(400).json({ error: "Missing ?user" });
+      return;
+    }
+    const [from, to] = parseRange(q);
+    const years = await buildYears(user, from, to);
+    res.setHeader("Cache-Control", "no-store");
+    res.status(200).json({ user, years });
+  } catch (e) {
     res.status(500).json({ error: String(e && e.message || e) });
   }
 };
+
+// ESM default export compatibility
+module.exports.default = module.exports;
