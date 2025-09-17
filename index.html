@@ -112,7 +112,7 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 <section class="card" id="panelV">
   <div class="row" style="justify-content:space-between; align-items:center">
     <label>Venn Diagram</label>
-    <div class="small" id="summaryV"></div>
+    
   </div>
   <div id="statusV" class="status"></div>
   <div id="vennWrap" style="position:relative;width:100%;">
@@ -561,7 +561,7 @@ function computeTotalsUnique(){
   const bName = ($("#userB").value || "B").trim() || "B";
   const total = totA + totB - common;
   const sum = $("#summaryV");
-  if (sum) sum.textContent = `${aName} ${totA} · ${bName} ${totB} · common ${common} · total ${total}`;
+if (sum) sum.textContent = "";
 
   return { totA, totB, common };
 }
