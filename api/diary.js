@@ -4,37 +4,39 @@ const cheerio = require("cheerio");
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15";
-const BLOCK_RE = /(Just a moment|Attention Required|cloudflare|Please enable cookies)/i;
+const BLOCK_RE = /(Just a moment|Attention Required|cloudflare|Please enable cookies|Checking your browser)/i;
 const SEL =
   "tr.diary-entry-row time[datetime], li.diary-entry time[datetime], article.diary-entry time[datetime]";
 const MAX_PAGES = 60; // safety
-
+const COOKIE = process.env.LB_COOKIE || "";
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function getHTML(url, retry = 1) {
-  const res = await fetch(url, {
-    headers: {
-      "user-agent": UA,
-      "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "accept-language": "en-US,en;q=0.7",
-      "cache-control": "no-cache",
-    },
-  });
-  const html = await res.text();
-  if (BLOCK_RE.test(html) && retry > 0) {
-    await sleep(600 + Math.random() * 600);
-    return getHTML(url, retry - 1);
+async function getHTML(url, retries = 3) {
+  const headers = {
+    "user-agent": UA,
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "accept-language": "en-US,en;q=0.7",
+    "cache-control": "no-cache",
+    "referer": "https://letterboxd.com/",
+  };
+  if (COOKIE) headers.cookie = COOKIE;
+
+  for (let i = 0; i <= retries; i++) {
+    const res = await fetch(url, { headers });
+    const html = await res.text();
+    if (!BLOCK_RE.test(html)) return html;
+    if (i === retries) return html;
+    await sleep(800 * Math.pow(1.6, i) + Math.random() * 400);
   }
-  return html;
 }
 
 function headerCount(html, year) {
-  // Examples: “Gage has logged 124 entries for films during 2025.”
   const text = cheerio.load(html)("body").text().replace(/\s+/g, " ");
-  const m = new RegExp(
-    `has\\s+logged\\s+([\\d,]+)\\s+entries\\s+for\\s+films\\s+during\\s+${year}`,
+  const re = new RegExp(
+    `\\bhas\\s+logged\\s+([\\d,]+)\\s+entr(?:y|ies)\\s+for\\s+film(?:s)?\\s+during\\s+${year}\\b`,
     "i"
-  ).exec(text);
+  );
+  const m = re.exec(text);
   return m ? parseInt(m[1].replace(/,/g, ""), 10) : null;
 }
 
@@ -49,27 +51,32 @@ function pageYearMatches(html, year) {
 }
 
 async function countYear(user, year) {
-  // 1) Try header (1 request)
   const base = `https://letterboxd.com/${encodeURIComponent(user)}/films/diary/for/${year}/`;
-  let html = await getHTML(base, 1);
-  let fromHeader = headerCount(html, year);
+
+  // 1) Try header
+  let html = await getHTML(base, 3);
+  const fromHeader = headerCount(html, year);
   if (Number.isInteger(fromHeader)) return fromHeader;
 
-  // 2) Paginate and count <time datetime> (page/2, page/3, …) until zero matches
+  // 2) Paginate and count <time datetime>
   let total = 0;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = page === 1 ? base : `${base}page/${page}/`;
-    html = await getHTML(url, 1);
-    if (BLOCK_RE.test(html)) {
-      // skip this year if blocked after retry
-      break;
-    }
+    html = await getHTML(url, 3);
+    if (BLOCK_RE.test(html)) break;
     const hits = pageYearMatches(html, year);
     if (hits === 0) break;
     total += hits;
-    // be polite to CF
     await sleep(200 + Math.random() * 300);
   }
+
+  // 3) Second-chance header if larger
+  try {
+    const again = await getHTML(base, 3);
+    const hc = headerCount(again, year);
+    if (Number.isInteger(hc) && hc > total) total = hc;
+  } catch {}
+
   return total;
 }
 
