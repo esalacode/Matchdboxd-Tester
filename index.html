@@ -95,6 +95,11 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 .year-svg { width:100%; height:220px; }
 .bar:hover { opacity:.9 }
 
+/* By-Year interactivity */
+#panelY { position: relative; }   /* positioning context for tooltip */
+.bar { pointer-events: none; }    /* bars don't eat pointer input */
+.hit { cursor: pointer; touch-action: pan-y; } /* large hover/tap bands */  
+  
 </style>
 </head>
 <body>
@@ -122,6 +127,7 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
   <div id="statusY" class="status"></div>
   <svg id="yearA" class="svg year-svg" viewBox="0 0 1200 220" aria-label="User A by year"></svg>
   <svg id="yearB" class="svg year-svg" viewBox="0 0 1200 220" aria-label="User B by year" style="margin-top:12px"></svg>
+  <div id="yearTip" class="tooltip"></div>
 </section>
 
 <!-- Venn Diagram panel -->
@@ -1061,13 +1067,13 @@ function drawYearBars(svgEl, yearCounts, label){
   svgEl.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svgEl.innerHTML = "";
 
+  // axis
   const gAxis = document.createElementNS(svgNS,"g");
   const base = document.createElementNS(svgNS,"line");
   base.setAttribute("x1", padL); base.setAttribute("x2", padL+innerW);
   base.setAttribute("y1", padT+innerH); base.setAttribute("y2", padT+innerH);
   base.setAttribute("stroke", "var(--grid)");
   gAxis.appendChild(base);
-
   for(const y of [yMin, yMax]){
     const tx = document.createElementNS(svgNS,"text");
     tx.setAttribute("x", xs(y));
@@ -1080,7 +1086,11 @@ function drawYearBars(svgEl, yearCounts, label){
   }
   svgEl.appendChild(gAxis);
 
-  const bw = Math.max(6, innerW / Math.max(1, years.length) * 0.9);
+  // spacing
+  const step = innerW / Math.max(1, years.length);
+  const bw = Math.max(6, step * 0.96); // closer bars
+
+  // bars (input-ignoring)
   for(const y of years){
     const c = yearCounts[y]||0;
     const x = xs(y) - bw/2;
@@ -1093,11 +1103,11 @@ function drawYearBars(svgEl, yearCounts, label){
     rect.setAttribute("rx","3");
     rect.setAttribute("fill","var(--accent2)");
     rect.setAttribute("opacity","0.95");
-    rect.appendChild(document.createElementNS(svgNS,"title"))
-         .textContent = `${c} films\nLogged in ${y}`;
+    rect.setAttribute("pointer-events","none");
     svgEl.appendChild(rect);
   }
 
+  // label
   const chip = document.createElementNS(svgNS,"text");
   chip.setAttribute("x", 56);
   chip.setAttribute("y", 16);
@@ -1105,6 +1115,40 @@ function drawYearBars(svgEl, yearCounts, label){
   chip.setAttribute("style","font:12px Inter, system-ui");
   chip.textContent = label;
   svgEl.appendChild(chip);
+
+  // tooltip + hit bands
+  const tipEl = document.getElementById("yearTip");
+  const panelRect = () => document.getElementById("panelY").getBoundingClientRect();
+
+  function showYearTip(yVal, cVal, ev){
+    tipEl.style.display = "block";
+    tipEl.textContent = `${cVal} films · Logged in ${yVal}`;
+    const r = panelRect();
+    const tx = Math.max(8, Math.min(ev.clientX - r.left, r.width - 8));
+    const ty = Math.max(8, ev.clientY - r.top - 16);
+    tipEl.style.transform = `translate(${tx}px,${ty}px)`;
+  }
+  function hideYearTip(){ tipEl.style.display = "none"; }
+
+  for (let i=0;i<years.length;i++){
+    const yVal = years[i];
+    const cVal = yearCounts[yVal] || 0;
+    const hit = document.createElementNS(svgNS,"rect");
+    hit.setAttribute("class","hit");
+    hit.setAttribute("x", xs(yVal) - step/2);
+    hit.setAttribute("y", padT);
+    hit.setAttribute("width", Math.max(step, 44)); // ≥44px for mobile
+    hit.setAttribute("height", innerH);
+    hit.setAttribute("fill", "transparent");
+    hit.addEventListener("pointermove", ev => showYearTip(yVal, cVal, ev));
+    hit.addEventListener("pointerleave", hideYearTip);
+    hit.addEventListener("pointerdown", ev => showYearTip(yVal, cVal, ev));
+    svgEl.appendChild(hit);
+  }
+
+  document.addEventListener("pointerdown", e => {
+    if (!e.target.closest("#panelY .hit")) hideYearTip();
+  }, { capture:true });
 }
 </script>
 </body>
