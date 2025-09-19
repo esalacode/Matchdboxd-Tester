@@ -49,11 +49,16 @@ footer{ color:#6a7b89; text-align:center; font-size:12px; padding:12px 0 32px;}
 .tick text { fill:#000000; font-size:13px; font-family:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
 .gridline{ stroke:#cccccc; stroke-width:1; }
 .diag{ stroke:#666666; stroke-dasharray:4 4; }
-.tooltip{ position:absolute; pointer-events:none; transform:translate(-50%, -120%);
+.tooltip{
+  position:absolute; pointer-events:none;
+  left:0; top:0;                       /* anchor for JS */
+  transform:translate(-50%,-120%);     /* center above pointer */
   background:#ffffff; border:1px solid #999; border-radius:4px;
   padding:6px 8px; font-size:12px; color:#000000;
   font-family:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.15); display:none; z-index:20; }
+  white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.15);
+  display:none; z-index:20;
+}
 #heatWrap, #histWrap { position:relative; width:100%; }
 .legend {
   display:flex;
@@ -94,7 +99,7 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 /* By-Year bars + interactions */
 .year-svg { width:100%; height:220px; }
 .bar { pointer-events:none; } /* let the hit band take events */
-.hit { cursor:pointer; touch-action:pan-y; }
+.hit { cursor:pointer; touch-action:pan-y; pointer-events:all; }
 .bar:hover { opacity:.9 }
 #panelY { position:relative; } /* tooltip positioning context */
   
@@ -1081,10 +1086,10 @@ function drawYearBars(svgEl, yearCounts, label){
   t2.textContent = years[years.length-1]; gAxis.appendChild(t2);
   svgEl.appendChild(gAxis);
 
-  // categorical x so bars + hits align tightly
+  // categorical X so bars + hits align tightly
   const n = years.length;
   const step = innerW / n;
-  const bw = Math.max(6, step*0.92);            // closer bars; lower to 0.88 for tighter
+  const bw = Math.max(6, step*0.98); // tight gaps
   const centers = years.map((_,i)=> padL + (i+0.5)*step);
 
   // bars
@@ -1109,16 +1114,18 @@ function drawYearBars(svgEl, yearCounts, label){
   chip.setAttribute("style","font:12px Inter, system-ui");
   chip.textContent = label; svgEl.appendChild(chip);
 
-  // tooltip + fat hit bands (full column incl. above bar)
+  // tooltip + hit bands
   const tipEl = document.getElementById("yearTip");
-  const panelR = () => document.getElementById("panelY").getBoundingClientRect();
+  const panelRect = () => document.getElementById("panelY").getBoundingClientRect();
+
   function showYearTip(yVal, cVal, ev){
     tipEl.style.display = "block";
     tipEl.textContent = `${cVal} films · Logged in ${yVal}`;
-    const r = panelR();
+    const r = panelRect();
     const tx = Math.max(8, Math.min(ev.clientX - r.left, r.width - 8));
     const ty = Math.max(8, ev.clientY - r.top - 16);
-    tipEl.style.transform = `translate(${tx}px,${ty}px)`;
+    tipEl.style.left = tx + "px";
+    tipEl.style.top  = ty + "px";
   }
   function hideYearTip(){ tipEl.style.display = "none"; }
 
@@ -1126,18 +1133,25 @@ function drawYearBars(svgEl, yearCounts, label){
     const yVal = years[i], cVal = yearCounts[yVal] || 0, cx = centers[i];
     const hit = document.createElementNS(svgNS,"rect");
     hit.setAttribute("class","hit");
-    const hw = Math.max(step, 44);            // ≥44px for touch
+    const hw = Math.max(step, 44); // >=44px for touch
     hit.setAttribute("x", cx - hw/2);
     hit.setAttribute("y", padT);
     hit.setAttribute("width", hw);
-    hit.setAttribute("height", innerH);       // includes space above the bar
-    hit.setAttribute("fill", "transparent");
-    hit.addEventListener("pointermove", ev => showYearTip(yVal, cVal, ev));
+    hit.setAttribute("height", innerH);        // include space above the bar
+    hit.setAttribute("fill", "rgba(0,0,0,0.001)");
+    hit.style.pointerEvents = "all";
+
+    // desktop + mobile
+    hit.addEventListener("pointerenter", ev => showYearTip(yVal, cVal, ev));
+    hit.addEventListener("pointermove",  ev => showYearTip(yVal, cVal, ev));
+    hit.addEventListener("pointerdown",  ev => showYearTip(yVal, cVal, ev)); // ← this line
+    hit.addEventListener("click",        ev => showYearTip(yVal, cVal, ev)); // iOS fallback
     hit.addEventListener("pointerleave", hideYearTip);
-    hit.addEventListener("pointerdown", ev => showYearTip(yVal, cVal, ev)); // tap
+
     svgEl.appendChild(hit);
   }
 
+  // hide when tapping outside the chart
   document.addEventListener("pointerdown", e => {
     if (!e.target.closest("#panelY .hit")) hideYearTip();
   }, { capture:true });
