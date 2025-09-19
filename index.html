@@ -96,9 +96,9 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 .bar:hover { opacity:.9 }
 
 /* By-Year interactivity */
-#panelY { position: relative; }   /* positioning context for tooltip */
-.bar { pointer-events: none; }    /* bars don't eat pointer input */
-.hit { cursor: pointer; touch-action: pan-y; } /* large hover/tap bands */  
+#panelY { position: relative; }      /* tooltip positioning context */
+.bar { pointer-events: none; }       /* bars don't eat input */
+.hit { cursor: pointer; touch-action: pan-y; } /* fat hover/tap bands */
   
 </style>
 </head>
@@ -1058,45 +1058,46 @@ function drawYearBars(svgEl, yearCounts, label){
   const innerW=W-padL-padR, innerH=H-padT-padB;
 
   const years = Object.keys(yearCounts||{}).map(x=>+x).sort((a,b)=>a-b);
-  if(years.length===0){ svgEl.innerHTML=""; return; }
+  if (years.length===0){ svgEl.innerHTML=""; return; }
   const yMin = years[0], yMax = years[years.length-1];
-  const xs = (y)=> padL + ( (y - yMin) / Math.max(1,(yMax-yMin)) ) * innerW;
-  const maxCnt = Math.max(...years.map(y=>yearCounts[y]||0));
-  const ys = (c)=> padT + innerH - (c/maxCnt)*innerH;
+  const xs = y => padL + ((y - yMin) / Math.max(1,(yMax-yMin))) * innerW;
+  const maxCnt = Math.max(1, ...years.map(y=>yearCounts[y]||0));
+  const ys = c => padT + innerH - (c/maxCnt)*innerH;
 
   svgEl.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svgEl.innerHTML = "";
 
-  // axis
+  // axis baseline + end ticks
   const gAxis = document.createElementNS(svgNS,"g");
   const base = document.createElementNS(svgNS,"line");
-  base.setAttribute("x1", padL); base.setAttribute("x2", padL+innerW);
-  base.setAttribute("y1", padT+innerH); base.setAttribute("y2", padT+innerH);
-  base.setAttribute("stroke", "var(--grid)");
+  base.setAttribute("x1", padL); base.setAttribute("y1", padT+innerH);
+  base.setAttribute("x2", padL+innerW); base.setAttribute("y2", padT+innerH);
+  base.setAttribute("stroke","var(--grid)"); base.setAttribute("stroke-width","1");
   gAxis.appendChild(base);
-  for(const y of [yMin, yMax]){
-    const tx = document.createElementNS(svgNS,"text");
-    tx.setAttribute("x", xs(y));
-    tx.setAttribute("y", H-8);
-    tx.setAttribute("text-anchor", y===yMin?"start":"end");
-    tx.setAttribute("fill","var(--muted)");
-    tx.setAttribute("style","font:12px Inter, system-ui");
-    tx.textContent = y;
-    gAxis.appendChild(tx);
-  }
+
+  const t1 = document.createElementNS(svgNS,"text");
+  t1.setAttribute("x", padL); t1.setAttribute("y", H-8);
+  t1.setAttribute("fill","var(--muted)");
+  t1.setAttribute("style","font:12px Inter, system-ui");
+  t1.textContent = yMin; gAxis.appendChild(t1);
+
+  const t2 = document.createElementNS(svgNS,"text");
+  t2.setAttribute("x", padL+innerW); t2.setAttribute("y", H-8);
+  t2.setAttribute("text-anchor","end");
+  t2.setAttribute("fill","var(--muted)");
+  t2.setAttribute("style","font:12px Inter, system-ui");
+  t2.textContent = yMax; gAxis.appendChild(t2);
+
   svgEl.appendChild(gAxis);
 
-  // spacing
+  // bars — tighten spacing via bw factor
   const step = innerW / Math.max(1, years.length);
-  const bw = Math.max(6, step * 0.96); // closer bars
-
-  // bars (input-ignoring)
-  for(const y of years){
-    const c = yearCounts[y]||0;
-    const x = xs(y) - bw/2;
+  const bw = Math.max(6, step*0.96); // change 0.96→0.92 for even tighter
+  for (const y of years){
+    const c = yearCounts[y] || 0;
     const rect = document.createElementNS(svgNS,"rect");
     rect.setAttribute("class","bar");
-    rect.setAttribute("x", x);
+    rect.setAttribute("x", xs(y) - bw/2);
     rect.setAttribute("y", ys(c));
     rect.setAttribute("width", bw);
     rect.setAttribute("height", Math.max(0, padT+innerH - ys(c)));
@@ -1109,28 +1110,26 @@ function drawYearBars(svgEl, yearCounts, label){
 
   // label
   const chip = document.createElementNS(svgNS,"text");
-  chip.setAttribute("x", 56);
-  chip.setAttribute("y", 16);
+  chip.setAttribute("x", 56); chip.setAttribute("y", 16);
   chip.setAttribute("fill","var(--muted)");
   chip.setAttribute("style","font:12px Inter, system-ui");
-  chip.textContent = label;
-  svgEl.appendChild(chip);
+  chip.textContent = label; svgEl.appendChild(chip);
 
-  // tooltip + hit bands
-  const tipEl = document.getElementById("yearTip");
-  const panelRect = () => document.getElementById("panelY").getBoundingClientRect();
+  // tooltip + fat hit bands
+  const tipEl   = document.getElementById("yearTip");
+  const panelR  = () => document.getElementById("panelY").getBoundingClientRect();
 
   function showYearTip(yVal, cVal, ev){
     tipEl.style.display = "block";
     tipEl.textContent = `${cVal} films · Logged in ${yVal}`;
-    const r = panelRect();
+    const r = panelR();
     const tx = Math.max(8, Math.min(ev.clientX - r.left, r.width - 8));
     const ty = Math.max(8, ev.clientY - r.top - 16);
     tipEl.style.transform = `translate(${tx}px,${ty}px)`;
   }
   function hideYearTip(){ tipEl.style.display = "none"; }
 
-  for (let i=0;i<years.length;i++){
+  for (let i=0; i<years.length; i++){
     const yVal = years[i];
     const cVal = yearCounts[yVal] || 0;
     const hit = document.createElementNS(svgNS,"rect");
@@ -1138,7 +1137,7 @@ function drawYearBars(svgEl, yearCounts, label){
     hit.setAttribute("x", xs(yVal) - step/2);
     hit.setAttribute("y", padT);
     hit.setAttribute("width", Math.max(step, 44)); // ≥44px for mobile
-    hit.setAttribute("height", innerH);
+    hit.setAttribute("height", innerH);            // covers above the bar
     hit.setAttribute("fill", "transparent");
     hit.addEventListener("pointermove", ev => showYearTip(yVal, cVal, ev));
     hit.addEventListener("pointerleave", hideYearTip);
