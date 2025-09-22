@@ -51,12 +51,12 @@ footer{ color:#6a7b89; text-align:center; font-size:12px; padding:12px 0 32px;}
 .diag{ stroke:#666666; stroke-dasharray:4 4; }
 .tooltip{
   position:absolute; pointer-events:none;
-  left:0; top:0;                       /* anchor for JS */
-  transform:translate(-50%,-120%);     /* center above pointer */
-  background:#ffffff; border:1px solid #999; border-radius:4px;
-  padding:6px 8px; font-size:12px; color:#000000;
+  left:0; top:0;                       /* JS sets final x/y */
+  transform:none;                      /* no auto shift */
+  background:#111922; border:1px solid #2a3745; border-radius:8px;
+  padding:6px 10px; font-size:12px; color:#c8d0d9;
   font-family:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.15);
+  white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,.35);
   display:none; z-index:20;
 }
 #heatWrap, #histWrap { position:relative; width:100%; }
@@ -1114,18 +1114,38 @@ function drawYearBars(svgEl, yearCounts, label){
   chip.setAttribute("style","font:12px Inter, system-ui");
   chip.textContent = label; svgEl.appendChild(chip);
 
-  // tooltip + hit bands
+    // tooltip + hit bands
   const tipEl = document.getElementById("yearTip");
-  const panelRect = () => document.getElementById("panelY").getBoundingClientRect();
+  const panel = document.getElementById("panelY");
+  const panelRect = () => panel.getBoundingClientRect();
 
   function showYearTip(yVal, cVal, ev){
     tipEl.style.display = "block";
     tipEl.textContent = `${cVal} films · Logged in ${yVal}`;
+
     const r = panelRect();
-    const tx = Math.max(8, Math.min(ev.clientX - r.left, r.width - 8));
-    const ty = Math.max(8, ev.clientY - r.top - 16);
-    tipEl.style.left = tx + "px";
-    tipEl.style.top  = ty + "px";
+    const margin = 8;
+
+    // initial anchor at pointer
+    let ax = ev.clientX - r.left;
+    let ay = ev.clientY - r.top;
+
+    // place temporarily to measure
+    tipEl.style.transform = "none";
+    tipEl.style.left = ax + "px";
+    tipEl.style.top  = ay + "px";
+    const tr = tipEl.getBoundingClientRect();
+    const w = tr.width, h = tr.height;
+
+    // final position: centered over pointer, fully inside panel
+    let x = ax - w/2;
+    let y = ay - h - 10;               // above pointer
+
+    x = Math.max(margin, Math.min(x, r.width  - w - margin));
+    y = Math.max(margin, Math.min(y, r.height - h - margin));
+
+    tipEl.style.left = Math.round(x) + "px";
+    tipEl.style.top  = Math.round(y) + "px";
   }
   function hideYearTip(){ tipEl.style.display = "none"; }
 
