@@ -1,97 +1,147 @@
 // /api/watchtime.js
 // Usage: /api/watchtime?user=<username>&maxPages=200
-// Sums minutes for each diary log by scraping film runtimes.
-// Node 18+. Install: npm i cheerio
+// Aggregates total watch minutes from the user’s diary by scraping film runtimes.
+// Node 18+. Requires: npm i cheerio
 const cheerio = require("cheerio");
 
-const UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17 Safari/605.1.15";
+const UA_LIST = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17 Safari/605.1.15",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36"
+];
+const pickUA = () => UA_LIST[Math.floor(Math.random() * UA_LIST.length)];
+
 const BLOCK_RE = /(Just a moment|Attention Required|cloudflare|Please enable cookies|Checking your browser)/i;
-const SEL_DIARY =
-  "tr.diary-entry-row a[href*='/film/'], li.diary-entry a[href*='/film/'], article.diary-entry a[href*='/film/']";
+const SEL_DIARY = "tr.diary-entry-row a[href*='/film/'], li.diary-entry a[href*='/film/'], article.diary-entry a[href*='/film/']";
 const COOKIE = process.env.LB_COOKIE || "";
-const MAX_PAGES = 200;
+const DEFAULT_MAX_PAGES = 200;
 
-function normUser(u){ if(!u) return null; u=String(u).trim().replace(/^@/,"").toLowerCase(); return /^[a-z0-9_-]{1,30}$/i.test(u)?u:null; }
-const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function getHTML(url, retries=3){
-  for(let i=0;i<retries;i++){
+function normUser(u){
+  if(!u) return null;
+  u = String(u).trim().replace(/^@/, "").toLowerCase();
+  return /^[a-z0-9_-]{1,30}$/i.test(u) ? u : null;
+}
+
+async function getHTML(url, retries = 3){
+  for (let i=0; i<=retries; i++){
     const res = await fetch(url, {
-      headers: { "user-agent": UA, "accept-language":"en-US,en;q=0.9", "cookie": COOKIE }
+      headers: {
+        "user-agent": pickUA(),
+        "accept": "text/html,application/xhtml+xml",
+        "cookie": COOKIE
+      }
     });
     const html = await res.text();
-    if (BLOCK_RE.test(html)) { await sleep(1500); continue; }
+    if (BLOCK_RE.test(html)) {
+      if (i === retries) throw new Error("Blocked by Cloudflare/anti-bot");
+      await sleep(800 + 400*i);
+      continue;
+    }
+    if (!res.ok) {
+      if (i === retries) throw new Error(`HTTP ${res.status} for ${url}`);
+      await sleep(400);
+      continue;
+    }
     return html;
   }
-  throw new Error("Blocked or unreachable: " + url);
+  throw new Error("Unreachable");
 }
 
-function nextPageURL(html){
+function iso8601ToMinutes(dur){
+  // e.g. PT2H14M, PT95M
+  const m = /^PT(?:(\d+)H)?(?:(\d+)M)?$/i.exec(dur || "");
+  if (!m) return null;
+  const h = m[1] ? +m[1] : 0;
+  const mm = m[2] ? +m[2] : 0;
+  return h*60 + mm;
+}
+
+function sniffRuntimeMinutes(html){
   const $ = cheerio.load(html);
-  const $a = $("a.next, a.next.page");
-  if(!$a.length) return null;
-  const href = $a.attr("href")||"";
-  return href ? new URL(href, "https://letterboxd.com").href : null;
+
+  // 1) schema.org duration
+  const iso = $("[itemprop='duration']").attr("content")
+         || $("meta[itemprop='duration']").attr("content")
+         || $("meta[property='video:duration']").attr("content");
+  const isoMin = iso ? iso8601ToMinutes(iso) : null;
+  if (Number.isFinite(isoMin)) return isoMin;
+
+  // 2) Text patterns commonly found on film pages
+  const text = $.text();
+  const m1 = /(\d+)\s*(?:mins?|minutes)\b/i.exec(text);
+  if (m1) return +m1[1];
+
+  // 3) “\d+h \d+m” or “\d+h”
+  const m2 = /(\d+)\s*h(?:\s*(\d+)\s*m)?/i.exec(text);
+  if (m2) return (+m2[1])*60 + (m2[2] ? +m2[2] : 0);
+
+  return null;
 }
 
-async function collectDiaryFilmHrefs(user, maxPages){
-  let url = `https://letterboxd.com/${encodeURIComponent(user)}/films/diary/`;
+async function getRuntimeMinutes(filmUrl){
+  const html = await getHTML(filmUrl);
+  return sniffRuntimeMinutes(html);
+}
+
+async function collectDiaryFilmLinks(user, maxPages){
   const hrefs = [];
-  let pages = 0;
-  while(url && pages < maxPages){
-    pages++;
-    const html = await getHTML(url, 3);
+  for (let page=1; page<=maxPages; page++){
+    const url = `https://letterboxd.com/${encodeURIComponent(user)}/films/diary/page/${page}/`;
+    const html = await getHTML(url);
     const $ = cheerio.load(html);
-    $(SEL_DIARY).each((_,a)=>{
-      const h = ($(a).attr("href")||"").trim();
-      if (h && /\/film\/[^/]+\/$/.test(h)) hrefs.push(new URL(h, "https://letterboxd.com").href);
+
+    const pageLinks = [];
+    $(SEL_DIARY).each((_, a) => {
+      const href = $(a).attr("href") || "";
+      if (href.includes("/film/")) {
+        // Normalize to absolute URL without query/fragment
+        const u = new URL(href, "https://letterboxd.com").toString().replace(/[#?].*$/, "");
+        pageLinks.push(u);
+      }
     });
-    url = nextPageURL(html);
-    await sleep(250);
+
+    if (pageLinks.length === 0) break; // no more pages
+    hrefs.push(...pageLinks);
+
+    // Be polite and reduce bot flags
+    await sleep(300);
   }
   return hrefs;
 }
 
-async function getRuntimeMinutes(filmURL){
-  // Accept either /film/slug/ or full URL
-  const html = await getHTML(filmURL, 3);
-  // Look for patterns like "123 mins"
-  const m = html.match(/(\d{2,3})\s*mins?/i);
-  if (m) return parseInt(m[1],10);
-  // Fallback: look inside microdata
-  const $ = cheerio.load(html);
-  const rt = $("p.text-link, .text-footer, .releaseyear, .microdata").text() || $("body").text();
-  const m2 = String(rt).match(/(\d{2,3})\s*mins?/i);
-  if (m2) return parseInt(m2[1],10);
-  return 0;
-}
-
-module.exports = async (req, res) => {
+module.exports = async function handler(req, res){
   try{
     const user = normUser(req.query.user);
-    const maxPages = Math.min(parseInt(req.query.maxPages||MAX_PAGES,10)||MAX_PAGES, MAX_PAGES);
-    if(!user) return res.status(400).json({error:"Bad user"});
-    const hrefs = await collectDiaryFilmHrefs(user, maxPages);
+    if (!user){ res.status(400).json({ error: "Missing or invalid ?user" }); return; }
+    const maxPages = Math.max(1, Math.min(DEFAULT_MAX_PAGES, parseInt(req.query.maxPages || DEFAULT_MAX_PAGES, 10) || DEFAULT_MAX_PAGES));
 
-    // Cache runtimes per film slug to avoid repeated fetch
-    const cache = new Map();
+    // 1) collect every diary entry film link
+    const hrefs = await collectDiaryFilmLinks(user, maxPages);
+
+    // 2) cache runtimes per film slug, but still sum per-entry
+    const cache = new Map(); // slug -> minutes
     let totalMinutes = 0;
 
-    for(const h of hrefs){
-      const slug = (h.match(/\/film\/([^/]+)\//)||[])[1]||h;
+    for (const h of hrefs){
+      const slug = h.replace(/^https?:\/\/letterboxd\.com\//, "").replace(/\/+$/, "");
       let mins = cache.get(slug);
       if (mins == null){
         mins = await getRuntimeMinutes(h);
-        cache.set(slug, mins);
+        // if runtime missing, assume 0 so it does not inflate
+        cache.set(slug, Number.isFinite(mins) ? mins : 0);
         await sleep(200);
       }
-      totalMinutes += Math.max(0, mins||0);
+      totalMinutes += Math.max(0, cache.get(slug));
     }
 
     res.setHeader("Cache-Control","public, max-age=1800");
     res.status(200).json({ user, logs: hrefs.length, minutes: totalMinutes, hours: +(totalMinutes/60).toFixed(2) });
   } catch(e){
-    res.status(500).json({ error: e.message||String(e) });
+    res.status(500).json({ error: e.message || String(e) });
   }
 };
+
+// ESM default export compatibility
+module.exports.default = module.exports;
