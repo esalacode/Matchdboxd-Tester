@@ -121,7 +121,7 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 </div>
 <div class="grid">
 
-  <!-- By Year panel -->
+<!-- By Year panel -->
 <section class="card" id="panelY">
   <div class="row" style="justify-content:space-between; align-items:center">
     <label>By Year</label>
@@ -132,6 +132,7 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
   <svg id="yearB" class="svg year-svg" viewBox="0 0 1200 220" aria-label="User B by year" style="margin-top:12px"></svg>
   <div id="yearTip" class="tooltip"></div>
 </section>
+
 
 <!-- Venn Diagram panel -->
 <section class="card" id="panelV">
@@ -171,6 +172,19 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 <div id="histTip" class="tooltip"></div>
 </div>
 </section>
+
+  <section class="card" id="panelT">
+  <div class="row" style="justify-content:space-between; align-items:center">
+    <label>Total Hours Logged</label>
+    <div class="small" id="summaryT"></div>
+  </div>
+  <div id="statusT" class="status"></div>
+  <div id="watchWrap">
+    <svg id="watchSVG" class="svg" viewBox="0 0 700 320" aria-label="Total hours logged per user"></svg>
+    <div id="watchTip" class="tooltip"></div>
+  </div>
+</section>
+
 
 <!-- NEW: Descriptive Statistics -->
 <section class="card" id="panelD">
@@ -228,11 +242,17 @@ async function fetchRatings(user){
   if(!r.ok) throw new Error(`Diary fetch failed for ${user}`);
   return r.json();
 }
+  async function fetchWatchtime(user, maxPages=200){
+  const r = await fetch(`/api/watchtime?user=${encodeURIComponent(user)}&maxPages=${maxPages}`, { headers:{Accept:"application/json"} });
+  if(!r.ok) throw new Error(`Watchtime fetch failed for ${user}`);
+  return r.json();
+}
+
 function setStatus(el,msg,isErr=false){ el.textContent = msg||""; el.style.color = isErr ? "#ffb3b3" : "#8fa0ad"; }
 
 // --- Shared state + overlap ---------------------------------------------------
 let lastA = [], lastB = [];
-let diaryA = null, diaryB = null; // per-year counts for each user
+let diaryA = null, diaryB = null; let watchA = 0, watchB = 0; // per-year counts for each user
 
 // Unique identity key for a film: prefer slug, then url, then title+year
 const filmKey = it => {
@@ -574,7 +594,6 @@ function gridAndTicks(
   return {xScale,yScale,x0,x1,y0,y1};
 }
 
-///<script>
   
 // --- Venn Diagram ---
 function computeTotalsUnique(){
@@ -966,6 +985,80 @@ function drawHistogram(rows, aName="A", bName="B"){
   });
 }
 
+  function drawTotalHours(){
+  const svg = $("#watchSVG"), tip=$("#watchTip"), status=$("#statusT"), sum=$("#summaryT");
+  svg.innerHTML="";
+  if (!watchA && !watchB){ setStatus(status, "No diary logs found."); sum.textContent=""; return; }
+  setStatus(status,"");
+
+  const uA = normUser($("#userA").value) || "A";
+  const uB = normUser($("#userB").value) || "B";
+
+  const data = [
+    {user:uA, minutes:watchA},
+    {user:uB, minutes:watchB}
+  ];
+  const hours = data.map(d=>d.minutes/60);
+  const maxH = Math.max(1, Math.ceil(Math.max(...hours)));
+
+  const W=700, H=320, m={left:80,right:24,top:30,bottom:48};
+  const x0=m.left, y0=m.top, innerW=W-m.left-m.right, innerH=H-m.top-m.bottom;
+
+  // scales
+  const x = (i)=> x0 + (i+0.1)*innerW/2;
+  const bw = innerW/2*0.8;
+  const y = (v)=> y0 + innerH - (v/maxH)*innerH;
+
+  // axes
+  const gY = document.createElementNS("http://www.w3.org/2000/svg","g");
+  for(let t=0; t<=maxH; t+=Math.max(1, Math.ceil(maxH/5))){
+    const yy = y(t);
+    const gl = document.createElementNS("http://www.w3.org/2000/svg","line");
+    gl.setAttribute("x1", x0); gl.setAttribute("x2", x0+innerW);
+    gl.setAttribute("y1", yy); gl.setAttribute("y2", yy);
+    gl.setAttribute("class", "gridline");
+    svg.appendChild(gl);
+
+    const lbl = document.createElementNS("http://www.w3.org/2000/svg","text");
+    lbl.setAttribute("x", x0-10); lbl.setAttribute("y", yy+4);
+    lbl.setAttribute("text-anchor","end"); lbl.setAttribute("class","tick");
+    lbl.textContent = t + " h";
+    svg.appendChild(lbl);
+  }
+
+  // bars
+  data.forEach((d,i)=>{
+    const h = hours[i];
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", x(i)); rect.setAttribute("y", y(h));
+    rect.setAttribute("width", bw); rect.setAttribute("height", (h/maxH)*innerH);
+    rect.setAttribute("fill", "#2a3745");
+    rect.addEventListener("mousemove", (ev)=>{
+      tip.style.display="block";
+      tip.textContent = `${d.user}: ${h.toFixed(2)} hours (${d.minutes} min)`;
+      tip.style.left = (ev.clientX+12)+"px"; tip.style.top = (ev.clientY+12)+"px";
+    });
+    rect.addEventListener("mouseleave", ()=>{ tip.style.display="none"; });
+    svg.appendChild(rect);
+
+    const name = document.createElementNS("http://www.w3.org/2000/svg","text");
+    name.setAttribute("x", x(i)+bw/2); name.setAttribute("y", y0+innerH+20);
+    name.setAttribute("text-anchor","middle"); name.setAttribute("class","tick");
+    name.textContent = d.user;
+    svg.appendChild(name);
+
+    const val = document.createElementNS("http://www.w3.org/2000/svg","text");
+    val.setAttribute("x", x(i)+bw/2); val.setAttribute("y", y(h)-8);
+    val.setAttribute("text-anchor","middle"); val.setAttribute("class","tick");
+    val.textContent = h.toFixed(2)+" h";
+    svg.appendChild(val);
+  });
+
+  const total = hours.reduce((s,v)=>s+v,0);
+  sum.textContent = `Total: ${total.toFixed(2)} hours across both users`;
+}
+
+  
 // --- Orchestration ------------------------------------------------------------
 function updateAllViews(){
   const rows = computeOverlap();
@@ -993,6 +1086,9 @@ function updateAllViews(){
     drawHistogram(rows, aName, bName);
   renderDescriptiveStats();
   renderByYear();
+
+  // NEW
+  drawTotalHours();
 }
 
 async function runBoth(){
@@ -1003,14 +1099,18 @@ async function runBoth(){
 
   showLoadingBar();
   try{
-    const [a, b, da, db] = await Promise.all([
-  fetchRatings(uA), fetchRatings(uB),
-  fetchDiary(uA, 200), fetchDiary(uB, 200)
-]);
+    const [a, b, da, db, wa, wb] = await Promise.all([
+      fetchRatings(uA), fetchRatings(uB),
+      fetchDiary(uA, 200), fetchDiary(uB, 200),
+      fetchWatchtime(uA, 200), fetchWatchtime(uB, 200)
+    ]);
+
     lastA = a.items || [];
     lastB = b.items || [];
     diaryA = da || null;
     diaryB = db || null;
+    watchA = (wa && wa.minutes) ? wa.minutes : 0;
+    watchB = (wb && wb.minutes) ? wb.minutes : 0;
 
     setStatus(status,"");
     updateAllViews();
@@ -1018,11 +1118,13 @@ async function runBoth(){
     setStatus(status, e.message || String(e), true);
     lastA = []; lastB = [];
     diaryA = null; diaryB = null;
+    watchA = 0; watchB = 0;
     updateAllViews();
   } finally {
     hideLoadingBar();
   }
 }
+
 
 $("#userA").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
 $("#userB").addEventListener("keydown", e => { if(e.key==="Enter"){ e.preventDefault(); runBoth(); }});
