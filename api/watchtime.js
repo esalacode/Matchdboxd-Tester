@@ -120,27 +120,61 @@ module.exports = async function handler(req, res){
     // 1) collect every diary entry film link
     const hrefs = await collectDiaryFilmLinks(user, maxPages);
 
-    // 2) cache runtimes per film slug, but still sum per-entry
-    const cache = new Map(); // slug -> minutes
-    let totalMinutes = 0;
+    // 2) build rewatch counts with normalized slugs
+const counts = new Map(); // canonical "/film/<slug>" -> diary count
+for (const h of hrefs) {
+  const m = h.match(/\/film\/([^/]+)\/?/);
+  if (!m) continue;
+  const slug = `/film/${m[1]}`; // canonical key
+  counts.set(slug, (counts.get(slug) || 0) + 1);
+}
 
-    for (const h of hrefs){
-      const slug = h.replace(/^https?:\/\/letterboxd\.com\//, "").replace(/\/+$/, "");
-      let mins = cache.get(slug);
-      if (mins == null){
-        mins = await getRuntimeMinutes(h);
-        // if runtime missing, assume 0 so it does not inflate
-        cache.set(slug, Number.isFinite(mins) ? mins : 0);
-        await sleep(200);
-      }
-      totalMinutes += Math.max(0, cache.get(slug));
-    }
+const slugs = Array.from(counts.keys());
+const cache = new Map(); // slug -> minutes
 
-    res.setHeader("Cache-Control","public, max-age=1800");
-    res.status(200).json({ user, logs: hrefs.length, minutes: totalMinutes, hours: +(totalMinutes/60).toFixed(2) });
-  } catch(e){
-    res.status(500).json({ error: e.message || String(e) });
+async function runWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let i = 0;
+  async function next() {
+    const idx = i++;
+    if (idx >= items.length) return;
+    try { results[idx] = await worker(items[idx], idx); }
+    catch (e) { results[idx] = e; }
+    return next();
   }
+  const starters = Array.from({ length: Math.min(limit, items.length) }, next);
+  await Promise.all(starters);
+  return results;
+}
+
+await runWithConcurrency(slugs, 10, async (slug) => {
+  // fetch runtime once per film
+  const filmUrl = new URL(`${slug}/`, "https://letterboxd.com").toString();
+  let mins = cache.get(slug);
+  if (mins == null) {
+    try { mins = await getRuntimeMinutes(filmUrl); }
+    catch { mins = 0; }
+    cache.set(slug, Number.isFinite(mins) ? mins : 0);
+  }
+});
+
+// sum = runtime * rewatch count
+let totalMinutes = 0;
+for (const [slug, cnt] of counts.entries()) {
+  totalMinutes += (cache.get(slug) || 0) * cnt;
+}
+
+
+res.setHeader("Cache-Control", "public, max-age=1800");
+res.status(200).json({
+  user,
+  logs: hrefs.length,
+  minutes: totalMinutes,
+  hours: +(totalMinutes / 60).toFixed(2)
+});
+} catch (e) {
+  res.status(500).json({ error: e.message || String(e) });
+}
 };
 
 // ESM default export compatibility
