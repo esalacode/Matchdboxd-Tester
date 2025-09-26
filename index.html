@@ -877,11 +877,24 @@ function drawHeatmap(rows, aName="A", bName="B"){
   const padX   = (bandX - cellW) / 2;
   const padY   = (bandY - cellH) / 2;
 
-  function color(t){
-    const v = Math.sqrt(Math.max(0,Math.min(1,t)));
-    const shade = 255 - Math.round(155*v);
-    return `rgb(${shade},${shade},255)`;
-  }
+  ffunction color(t){
+  // t in [0,1] → theme gradient
+  // 0: #007FFF  0.5: #ff1fab  1: #bf430b
+  const stops = [
+    {p:0.0, c:[0,127,255]},    // #007FFF
+    {p:0.5, c:[255,31,171]},   // #ff1fab
+    {p:1.0, c:[191,67,11]}     // #bf430b
+  ];
+  const v = Math.max(0, Math.min(1, t));
+  let i = 0;
+  while (i < stops.length-1 && v > stops[i+1].p) i++;
+  const a = stops[i], b = stops[i+1];
+  const u = (v - a.p) / (b.p - a.p || 1);
+  const r = Math.round(a.c[0] + (b.c[0]-a.c[0]) * u);
+  const g = Math.round(a.c[1] + (b.c[1]-a.c[1]) * u);
+  const bch= Math.round(a.c[2] + (b.c[2]-a.c[2]) * u);
+  return `rgb(${r},${g},${bch})`;
+}
 
   vals.forEach((ax, i)=>{
     vals.forEach((by, j)=>{
@@ -1188,6 +1201,28 @@ function drawYearBars(svgEl, yearCounts, label){
   t2.textContent = years[years.length-1]; gAxis.appendChild(t2);
   svgEl.appendChild(gAxis);
 
+  // LEFT→RIGHT histogram gradient spanning the whole plot area
+  // Stops: #007FFF → #ff1fab → #bf430b
+  const defs = document.createElementNS(svgNS,"defs");
+  const grad = document.createElementNS(svgNS,"linearGradient");
+  grad.setAttribute("id","yearGrad");
+  grad.setAttribute("gradientUnits","userSpaceOnUse");
+  grad.setAttribute("x1", String(padL));
+  grad.setAttribute("y1", "0");
+  grad.setAttribute("x2", String(padL+innerW));
+  grad.setAttribute("y2", "0");
+  const mkStop = (off, col) => {
+    const s = document.createElementNS(svgNS,"stop");
+    s.setAttribute("offset", off);
+    s.setAttribute("stop-color", col);
+    return s;
+  };
+  grad.appendChild(mkStop("0%","#007FFF"));
+  grad.appendChild(mkStop("50%","#ff1fab"));
+  grad.appendChild(mkStop("100%","#bf430b"));
+  defs.appendChild(grad);
+  svgEl.appendChild(defs);
+
   // categorical X so bars + hits align tightly
   const n = years.length;
   const step = innerW / n;
@@ -1204,7 +1239,7 @@ function drawYearBars(svgEl, yearCounts, label){
     rect.setAttribute("width", bw);
     rect.setAttribute("height", Math.max(0, padT+innerH - yScale(c)));
     rect.setAttribute("rx","3");
-    rect.setAttribute("fill","var(--accent2)");
+    rect.setAttribute("fill","url(#yearGrad)");
     rect.setAttribute("opacity","0.95");
     svgEl.appendChild(rect);
   }
@@ -1216,68 +1251,37 @@ function drawYearBars(svgEl, yearCounts, label){
   chip.setAttribute("style","font:12px Inter, system-ui");
   chip.textContent = label; svgEl.appendChild(chip);
 
-    // tooltip + hit bands
+  // tooltip + hit bands
   const tipEl = document.getElementById("yearTip");
-  const panel = document.getElementById("panelY");
-  const panelRect = () => panel.getBoundingClientRect();
-
   function showYearTip(yVal, cVal, ev){
-    tipEl.style.display = "block";
-    tipEl.textContent = `${cVal} films · Logged in ${yVal}`;
-
-    const r = panelRect();
-    const margin = 8;
-
-    // initial anchor at pointer
-    let ax = ev.clientX - r.left;
-    let ay = ev.clientY - r.top;
-
-    // place temporarily to measure
-    tipEl.style.transform = "none";
-    tipEl.style.left = ax + "px";
-    tipEl.style.top  = ay + "px";
-    const tr = tipEl.getBoundingClientRect();
-    const w = tr.width, h = tr.height;
-
-    // final position: centered over pointer, fully inside panel
-    let x = ax - w/2;
-    let y = ay - h - 10;               // above pointer
-
-    x = Math.max(margin, Math.min(x, r.width  - w - margin));
-    y = Math.max(margin, Math.min(y, r.height - h - margin));
-
-    tipEl.style.left = Math.round(x) + "px";
-    tipEl.style.top  = Math.round(y) + "px";
+    tipEl.style.display="block";
+    tipEl.textContent = `${yVal}: ${cVal}`;
+    const r = svgEl.getBoundingClientRect();
+    tipEl.style.left = `${ev.clientX - r.left + 12}px`;
+    tipEl.style.top  = `${ev.clientY - r.top  + 12}px`;
   }
   function hideYearTip(){ tipEl.style.display = "none"; }
 
   for (let i=0; i<n; i++){
-    const yVal = years[i], cVal = yearCounts[yVal] || 0, cx = centers[i];
+    const y = years[i], c = yearCounts[y]||0, cx = centers[i];
     const hit = document.createElementNS(svgNS,"rect");
     hit.setAttribute("class","hit");
-    const hw = Math.max(step, 44); // >=44px for touch
-    hit.setAttribute("x", cx - hw/2);
+    hit.setAttribute("x", cx - step/2);
     hit.setAttribute("y", padT);
-    hit.setAttribute("width", hw);
-    hit.setAttribute("height", innerH);        // include space above the bar
-    hit.setAttribute("fill", "rgba(0,0,0,0.001)");
-    hit.style.pointerEvents = "all";
-
-    // desktop + mobile
-    hit.addEventListener("pointerenter", ev => showYearTip(yVal, cVal, ev));
-    hit.addEventListener("pointermove",  ev => showYearTip(yVal, cVal, ev));
-    hit.addEventListener("pointerdown",  ev => showYearTip(yVal, cVal, ev)); // ← this line
-    hit.addEventListener("click",        ev => showYearTip(yVal, cVal, ev)); // iOS fallback
+    hit.setAttribute("width", step);
+    hit.setAttribute("height", innerH);
+    hit.setAttribute("fill","rgba(0,0,0,0.001)");
+    hit.addEventListener("pointerenter", ev => showYearTip(y, c, ev));
+    hit.addEventListener("click",        ev => showYearTip(y, c, ev)); // iOS
     hit.addEventListener("pointerleave", hideYearTip);
-
     svgEl.appendChild(hit);
   }
 
-  // hide when tapping outside the chart
   document.addEventListener("pointerdown", e => {
     if (!e.target.closest("#panelY .hit")) hideYearTip();
   }, { capture:true });
 }
+  
 </script>
 </body>
 </html>
