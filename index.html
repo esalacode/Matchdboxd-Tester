@@ -877,7 +877,7 @@ function drawHeatmap(rows, aName="A", bName="B"){
   const padX   = (bandX - cellW) / 2;
   const padY   = (bandY - cellH) / 2;
 
-  ffunction color(t){
+  function color(t){
   // t in [0,1] → theme gradient
   // 0: #007FFF  0.5: #ff1fab  1: #bf430b
   const stops = [
