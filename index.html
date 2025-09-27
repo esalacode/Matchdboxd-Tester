@@ -626,19 +626,14 @@ function drawVenn(t, aName="A", bName="B"){
   if (!totA || !totB){ setStatus(status,"Enter two valid users."); return; }
   setStatus(status,"");
 
-  // layout
   const m = {left:24, right:24, top:56, bottom:24};
   const boxW = W - m.left - m.right, boxH = H - m.top - m.bottom;
 
-  // radii by area ~ counts
   let rA = Math.sqrt(totA), rB = Math.sqrt(totB);
   const s = (boxH * 0.38) / Math.max(rA, rB);
   rA *= s; rB *= s;
 
-  // clamp for acos
   const clamp1 = v => Math.max(-1, Math.min(1, v));
-
-  // circle–circle intersection area
   function Aint(ra, rb, d){
     if (d >= ra + rb) return 0;
     if (d <= Math.abs(ra - rb)) return Math.PI * Math.min(ra, rb) ** 2;
@@ -647,197 +642,113 @@ function drawVenn(t, aName="A", bName="B"){
     return ra*ra*a1 + rb*rb*a2 - d*ra*Math.sin(a1);
   }
 
-  // target overlap area (π·s² per film)
-  const areaPerFilm = Math.PI * (rA*rA) / totA;
-  const target = areaPerFilm * common;
-
-  // solve center distance d with edge cases
   let d;
-  const minD = Math.abs(rA - rB); // full containment
-  const maxD = rA + rB;           // no overlap
+  const minD = Math.abs(rA - rB), maxD = rA + rB;
   if (common <= 0) d = maxD;
   else if (common >= Math.min(totA, totB)) d = minD;
-  else {
-    let lo = minD, hi = maxD;
-    for (let i=0;i<40;i++){
-      const mid = 0.5*(lo+hi);
-      const ai = Aint(rA, rB, mid);
-      if (ai >= target) lo = mid; else hi = mid;
-    }
-    d = 0.5*(lo+hi);
-  }
+  else { let lo=minD, hi=maxD; for(let i=0;i<40;i++){ const mid=(lo+hi)/2; (Aint(rA,rB,mid) >= Math.PI*(rA*rA/totA)*common) ? lo=mid : hi=mid; } d=(lo+hi)/2; }
 
-  // fit width
-  const span = d + rA + rB;
-  if (span > boxW){ const sf = boxW / span; rA*=sf; rB*=sf; d*=sf; }
+  const span = d + rA + rB; if (span > boxW){ const sf = boxW/span; rA*=sf; rB*=sf; d*=sf; }
 
-  // centers
   const cy = m.top + boxH*0.50;
-  const clusterW = d + rA + rB;
-  const startX = m.left + (boxW - clusterW)/2;
-  const xA = startX + rA;
-  const xB = xA + d;
+  const startX = m.left + (boxW - (d + rA + rB))/2;
+  const xA = startX + rA, xB = xA + d;
 
-  // helper
-  const add = (n, attrs) => { const el=document.createElementNS("http://www.w3.org/2000/svg",n);
-    for (const k in attrs) el.setAttribute(k, attrs[k]); svg.appendChild(el); return el; };
+  const add = (n, attrs) => { const el=document.createElementNS("http://www.w3.org/2000/svg",n); for (const k in attrs) el.setAttribute(k, attrs[k]); svg.appendChild(el); return el; };
 
-  // fills
-  const fillA = "#007FFF", fillB = "#bf430b", fillAB = "#ff1fab";
-
-  // base circles
+  const fillA="#007FFF", fillB="#bf430b", fillAB="#ff1fab";
   add("circle",{cx:xA, cy, r:rA, fill:fillA});
   add("circle",{cx:xB, cy, r:rB, fill:fillB});
 
-  // overlap lens fill
-  function drawOverlapLens(cx1, r1, cx2, r2, cy, d){
-    if (d >= r1 + r2) return;
-    if (d <= Math.abs(r1 - r2)) {
-      const cx = (r1 <= r2) ? cx1 : cx2;
-      const rr = Math.min(r1, r2);
-      add("circle",{cx, cy, r: rr, fill: fillAB});
-      return;
-    }
-    const a1 = Math.acos(clamp1((d*d + r1*r1 - r2*r2)/(2*d*r1)));
-    const a2 = Math.acos(clamp1((d*d + r2*r2 - r1*r1)/(2*d*r2)));
-    const p1x = cx1 + r1 * Math.cos(a1),  p1y = cy - r1 * Math.sin(a1);
-    const p2x = cx1 + r1 * Math.cos(-a1), p2y = cy - r1 * Math.sin(-a1);
-    const q1x = cx2 + r2 * Math.cos(Math.PI - a2),  q1y = cy - r2 * Math.sin(Math.PI - a2);
-    const path = [
-      `M ${p1x} ${p1y}`,
-      `A ${r1} ${r1} 0 0 1 ${p2x} ${p2y}`,
-      `A ${r2} ${r2} 0 0 1 ${q1x} ${q1y}`,
-      `A ${r1} ${r1} 0 0 0 ${p1x} ${p1y}`,
-      "Z"
-    ].join(" ");
+  (function drawOverlapLens(){
+    if (d >= rA + rB) return;
+    if (d <= Math.abs(rA - rB)) { const cx=(rA<=rB)?xA:xB; add("circle",{cx, cy, r:Math.min(rA,rB), fill:fillAB}); return; }
+    const a1=Math.acos(clamp1((d*d+rA*rA-rB*rB)/(2*d*rA)));
+    const a2=Math.acos(clamp1((d*d+rB*rB-rA*rA)/(2*d*rB)));
+    const p1x=xA+rA*Math.cos(a1), p1y=cy-rA*Math.sin(a1);
+    const p2x=xA+rA*Math.cos(-a1),p2y=cy-rA*Math.sin(-a1);
+    const q1x=xB+rB*Math.cos(Math.PI-a2), q1y=cy-rB*Math.sin(Math.PI-a2);
+    const path=[`M ${p1x} ${p1y}`,`A ${rA} ${rA} 0 0 1 ${p2x} ${p2y}`,`A ${rB} ${rB} 0 0 1 ${q1x} ${q1y}`,`A ${rA} ${rA} 0 0 0 ${p1x} ${p1y}`,"Z"].join(" ");
     add("path",{d:path, fill:fillAB});
-  }
-  drawOverlapLens(xA, rA, xB, rB, cy, d);
+  })();
 
-  // union percentages
   const total = totA + totB - common;
-  const uniqueA = totA - common;
-  const uniqueB = totB - common;
-  const pct = v => total ? Math.round(100 * v / total) : 0;
+  const uniqueA = totA - common, uniqueB = totB - common;
+  const pct = v => total ? Math.round(100*v/total) : 0;
 
-  const tip = $("#vennTip");
+  const tip = $("#vennTip"), wrap=$("#vennWrap");
+  function placeTip(e){
+    const R=wrap.getBoundingClientRect();
+    const x=e.clientX-R.left+12, y=e.clientY-R.top+12;
+    const maxX=R.width-tip.offsetWidth-8, maxY=R.height-tip.offsetHeight-8;
+    tip.style.left=Math.max(8,Math.min(x,maxX))+"px";
+    tip.style.top =Math.max(8,Math.min(y,maxY))+"px";
+  }
   function attachTip(el, textFn){
     el.addEventListener("mouseenter", ()=>{ tip.style.display="block"; tip.textContent=textFn(); });
-    el.addEventListener("mousemove", e=>{
-      const r = $("#vennWrap").getBoundingClientRect();
-      tip.style.left = (e.clientX - r.left) + "px";
-      tip.style.top  = (e.clientY - r.top)  + "px";
-    });
+    el.addEventListener("mousemove", placeTip);
     el.addEventListener("mouseleave", ()=>{ tip.style.display="none"; });
   }
 
-  const fontNumPx  = Math.max(12, Math.min(18, Math.round(Math.min(rA, rB) * 0.22)));
-  const fontNamePx = Math.max(12, Math.min(16, Math.round(Math.min(rA, rB) * 0.18)));
-    const fontNum  = `${fontNumPx}px "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;  // numbers (223, 110, 509)
-    const fontName = `${fontNamePx}px "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;  // user labels
+  const fontNumPx=Math.max(12,Math.min(18,Math.round(Math.min(rA,rB)*0.22)));
+  const fontNamePx=Math.max(12,Math.min(16,Math.round(Math.min(rA,rB)*0.18)));
+  const fontNum =`${fontNumPx}px "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+  const fontName=`${fontNamePx}px "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
 
-  const txt = (attrs, s) => { const t = add("text", attrs); t.textContent = s; return t; };
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const txt=(attrs,s)=>{ const t=add("text",attrs); t.textContent=s; return t; };
+  const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 
-  // geometry flags
   const hasOverlap = d < rA + rB && d > Math.abs(rA - rB);
   const contained  = d <= Math.abs(rA - rB);
+  const safeD=Math.max(d,1e-6);
+  let aA=rA, aB=rB;
+  if(hasOverlap){ aA=(safeD*safeD+rA*rA-rB*rB)/(2*safeD); aB=(safeD*safeD+rB*rB-rA*rA)/(2*safeD); }
+  else if(contained){ aA=(rA<=rB)?0:rA; aB=(rB<=rA)?0:rB; }
 
-  // chord distances
-  const safeD = Math.max(d, 1e-6);
-  let aA = rA, aB = rB;
-  if (hasOverlap) {
-    aA = (safeD*safeD + rA*rA - rB*rB) / (2*safeD);
-    aB = (safeD*safeD + rB*rB - rA*rA) / (2*safeD);
-  } else if (contained) {
-    aA = (rA <= rB) ? 0 : rA;
-    aB = (rB <= rA) ? 0 : rB;
-  }
+  const uA=totA-common, uB=totB-common;
+  const xTotA=(uA>0&&hasOverlap)? xA+(aA-rA)/2 : xA;
+  const xTotB=(uB>0&&hasOverlap)? xB+(rB-aB)/2 : xB;
+  const yTotA=uA>0?cy:cy-rA*0.30;
+  const yTotB=uB>0?cy:cy-rB*0.30;
 
-  // unique number positions
-  const uA = totA - common;
-  const uB = totB - common;
-  const xTotA = (uA > 0 && hasOverlap) ? xA + (aA - rA)/2 : xA;
-  const xTotB = (uB > 0 && hasOverlap) ? xB + (rB - aB)/2 : xB;
-  const yTotA = uA > 0 ? cy : cy - rA*0.30;
-  const yTotB = uB > 0 ? cy : cy - rB*0.30;
-
-  //THIS IS THE ORIGINAL const xLens = hasOverlap ? (xA + aA + xB - aB)/2 : (xA + xB)/2;
-  //BELOW WAS THE REPLACEMENT
-  const xLens = contained
-  ? (rA <= rB ? xA : xB)
-  : (hasOverlap ? (xA + aA + xB - aB)/2 : (xA + xB)/2);
-
+  const xLens = contained ? (rA<=rB?xA:xB) : (hasOverlap ? (xA+aA + xB-aB)/2 : (xA+xB)/2);
   const leftContained  = (d <= Math.abs(rA - rB)) && (rA <= rB);
   const rightContained = (d <= Math.abs(rA - rB)) && (rB <= rA);
 
-  /// if (!leftContained) {
-  //  txt({x:xTotA, y:yTotA, "text-anchor":"middle", fill:"#000", style:`font:${fontNum};pointer-events:none`}, `${totA}`);
-  //}
-  //if (common > 0) {
-  //  txt({x:xLens, y:cy, "text-anchor":"middle", fill:"#000", style:`font:${fontNum};pointer-events:none`}, `${common}`);
-  //}
-  //if (!rightContained) {
-  //  txt({x:xTotB, y:yTotB, "text-anchor":"middle", fill:"#000", style:`font:${fontNum};pointer-events:none`}, `${totB}`);
-  //}
-  //////THE BELOW REPLACED THE ABOVE
-  if (!leftContained) {
-  txt({x:xTotA, y:yTotA, "text-anchor":"middle", fill:"#000", style:`font:${fontNum};pointer-events:none`}, `${totA}`);
-}
-if (common > 0) {
-  txt({x:xLens, y:cy, "text-anchor":"middle", fill:"#000", style:`font:${fontNum};pointer-events:none`}, `${common}`);
-}
-if (!rightContained) {
-  txt({x:xTotB, y:yTotB, "text-anchor":"middle", fill:"#000", style:`font:${fontNum};pointer-events:none`}, `${totB}`);
-}
+  if(!leftContained)  txt({x:xTotA,y:yTotA,"text-anchor":"middle",fill:"#000",style:`font:${fontNum};pointer-events:none`}, `${totA}`);
+  if(common>0)        txt({x:xLens,y:cy,   "text-anchor":"middle",fill:"#000",style:`font:${fontNum};pointer-events:none`}, `${common}`);
+  if(!rightContained) txt({x:xTotB,y:yTotB,"text-anchor":"middle",fill:"#000",style:`font:${fontNum};pointer-events:none`}, `${totB}`);
 
-  // names
-  function placeName(cx, cy, r, deg, label, anchor){
-    const theta = (Math.PI/180) * deg;
-    const offset = Math.max(16, r * 0.28);
-    let x = cx + (r + offset) * Math.cos(theta);
-    let y = cy + (r + offset) * Math.sin(theta);
-    const xMin = m.left + 6, xMax = W - m.right - 6;
-    const yMin = m.top + 6,  yMax = H - m.bottom - 6;
-    x = clamp(x, xMin, xMax);
-    y = clamp(y, yMin, yMax);
-    return txt({x, y, "text-anchor": anchor, fill:"#000", style:`font:${fontName}`}, label);
+  function placeName(cx,cy0,r,deg,label,anchor){
+    const theta=(Math.PI/180)*deg, offset=Math.max(16,r*0.28);
+    let x=cx+(r+offset)*Math.cos(theta), y=cy0+(r+offset)*Math.sin(theta);
+    const xMin=m.left+6, xMax=W-m.right-6, yMin=m.top+6, yMax=H-m.bottom-6;
+    x=clamp(x,xMin,xMax); y=clamp(y,yMin,yMax);
+    return txt({x,y,"text-anchor":anchor,fill:"#000",style:`font:${fontName};cursor:help`},label);
   }
-  const nameAEl = placeName(xA, cy, rA, -150, aName, "start");
-  const nameBEl = placeName(xB, cy, rB,  -30, bName, "start");
-  nameAEl.setAttribute("style", (nameAEl.getAttribute("style")||"") + ";cursor:help");
-  nameBEl.setAttribute("style", (nameBEl.getAttribute("style")||"") + ";cursor:help");
+  const nameAEl=placeName(xA,cy,rA,-150,aName,"start");
+  const nameBEl=placeName(xB,cy,rB, -30,bName,"start");
   attachTip(nameAEl, ()=> `${uniqueA} unique (${pct(uniqueA)}%)`);
   attachTip(nameBEl, ()=> `${uniqueB} unique (${pct(uniqueB)}%)`);
 
-  // hit areas
-  const leftHit  = add("circle",{cx:xA, cy, r:rA, fill:"rgba(0,0,0,0.001)"});
-  attachTip(leftHit,  ()=> `${uniqueA} unique (${pct(uniqueA)}%)`);
-  const rightHit = add("circle",{cx:xB, cy, r:rB, fill:"rgba(0,0,0,0.001)"});
-  attachTip(rightHit, ()=> `${uniqueB} unique (${pct(uniqueB)}%)`);
+  const leftHit  = add("circle",{cx:xA, cy, r:rA, fill:"rgba(0,0,0,0.001)"});  attachTip(leftHit,  ()=> `${uniqueA} unique (${pct(uniqueA)}%)`);
+  const rightHit = add("circle",{cx:xB, cy, r:rB, fill:"rgba(0,0,0,0.001)"});  attachTip(rightHit, ()=> `${uniqueB} unique (${pct(uniqueB)}%)`);
 
-  // overlap hit
   (function(){
-    if (d >= rA + rB) return;                       // no overlap
-    if (d <= Math.abs(rA - rB)) {                   // full containment
+    if (d >= rA + rB) return;
+    if (d <= Math.abs(rA - rB)) {
       const cx = (rA <= rB) ? xA : xB;
       const rr = Math.min(rA, rB);
       const lensHit = add("circle",{cx, cy, r: rr, fill:"rgba(0,0,0,0.001)"});
       attachTip(lensHit, ()=> `${common} in common (${pct(common)}% of union)`);
       return;
     }
-    const a1 = Math.acos(clamp1((d*d + rA*rA - rB*rB)/(2*d*rA)));
-    const a2 = Math.acos(clamp1((d*d + rB*rB - rA*rA)/(2*d*rB)));
-    const p1x = xA + rA * Math.cos(a1),  p1y = cy - rA * Math.sin(a1);
-    const p2x = xA + rA * Math.cos(-a1), p2y = cy - rA * Math.sin(-a1);
-    const q1x = xB + rB * Math.cos(Math.PI - a2),  q1y = cy - rB * Math.sin(Math.PI - a2);
-    const dLens = [
-      `M ${p1x} ${p1y}`,
-      `A ${rA} ${rA} 0 0 1 ${p2x} ${p2y}`,
-      `A ${rB} ${rB} 0 0 1 ${q1x} ${q1y}`,
-      `A ${rA} ${rA} 0 0 0 ${p1x} ${p1y}`,
-      "Z"
-    ].join(" ");
+    const a1=Math.acos(clamp1((d*d+rA*rA-rB*rB)/(2*d*rA)));
+    const a2=Math.acos(clamp1((d*d+rB*rB-rA*rA)/(2*d*rB)));
+    const p1x=xA+rA*Math.cos(a1), p1y=cy-rA*Math.sin(a1);
+    const p2x=xA+rA*Math.cos(-a1),p2y=cy-rA*Math.sin(-a1);
+    const q1x=xB+rB*Math.cos(Math.PI-a2), q1y=cy-rB*Math.sin(Math.PI-a2);
+    const dLens=[`M ${p1x} ${p1y}`,`A ${rA} ${rA} 0 0 1 ${p2x} ${p2y}`,`A ${rB} ${rB} 0 0 1 ${q1x} ${q1y}`,`A ${rA} ${rA} 0 0 0 ${p1x} ${p1y}`,"Z"].join(" ");
     const lensHit = add("path",{d:dLens, fill:"rgba(0,0,0,0.001)"});
     attachTip(lensHit, ()=> `${common} in common (${pct(common)}% of union)`);
   })();
@@ -878,23 +789,23 @@ function drawHeatmap(rows, aName="A", bName="B"){
   const padY   = (bandY - cellH) / 2;
 
   function color(t){
-  // t in [0,1] → theme gradient
-  // 0: #007FFF  0.5: #ff1fab  1: #bf430b
-  const stops = [
-    {p:0.0, c:[0,127,255]},    // #007FFF
-    {p:0.5, c:[255,31,171]},   // #ff1fab
-    {p:1.0, c:[191,67,11]}     // #bf430b
-  ];
-  const v = Math.max(0, Math.min(1, t));
-  let i = 0;
-  while (i < stops.length-1 && v > stops[i+1].p) i++;
-  const a = stops[i], b = stops[i+1];
-  const u = (v - a.p) / (b.p - a.p || 1);
-  const r = Math.round(a.c[0] + (b.c[0]-a.c[0]) * u);
-  const g = Math.round(a.c[1] + (b.c[1]-a.c[1]) * u);
-  const bch= Math.round(a.c[2] + (b.c[2]-a.c[2]) * u);
-  return `rgb(${r},${g},${bch})`;
-}
+    const stops = [{p:0.0,c:[0,127,255]},{p:0.5,c:[255,31,171]},{p:1.0,c:[191,67,11]}];
+    const v=Math.max(0,Math.min(1,t)); let i=0; while(i<stops.length-1 && v>stops[i+1].p) i++;
+    const a=stops[i], b=stops[i+1], u=(v-a.p)/(b.p-a.p||1);
+    const R=Math.round(a.c[0]+(b.c[0]-a.c[0])*u);
+    const G=Math.round(a.c[1]+(b.c[1]-a.c[1])*u);
+    const B=Math.round(a.c[2]+(b.c[2]-a.c[2])*u);
+    return `rgb(${R},${G},${B})`;
+  }
+
+  const wrap=$("#heatWrap");
+  function placeTip(e){
+    const R=wrap.getBoundingClientRect();
+    const x=e.clientX-R.left+12, y=e.clientY-R.top+12;
+    const maxX=R.width-tip.offsetWidth-8, maxY=R.height-tip.offsetHeight-8;
+    tip.style.left=Math.max(8,Math.min(x,maxX))+"px";
+    tip.style.top =Math.max(8,Math.min(y,maxY))+"px";
+  }
 
   vals.forEach((ax, i)=>{
     vals.forEach((by, j)=>{
@@ -904,10 +815,8 @@ function drawHeatmap(rows, aName="A", bName="B"){
       const x = x0 + i * bandX + padX;
       const y = y1 + (bins - 1 - j) * bandY + padY;
       const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
-      rect.setAttribute("x", x);
-      rect.setAttribute("y", y);
-      rect.setAttribute("width",  cellW);
-      rect.setAttribute("height", cellH);
+      rect.setAttribute("x", x); rect.setAttribute("y", y);
+      rect.setAttribute("width",  cellW); rect.setAttribute("height", cellH);
       rect.setAttribute("fill", v ? color(v/maxCount) : "rgb(240,240,255)");
       rect.setAttribute("stroke", "#e6e6f8");
       rect.addEventListener("mouseenter",()=>{
@@ -915,32 +824,22 @@ function drawHeatmap(rows, aName="A", bName="B"){
         tip.style.display="block";
         tip.textContent = `${aName} ${ax}★, ${bName} ${by}★ — ${v} (${Math.round(100*v/rows.length)}%)`;
       });
-      rect.addEventListener("mousemove",e=>{
-        const rectB = $("#heatWrap").getBoundingClientRect();
-        tip.style.left=(e.clientX-rectB.left)+"px";
-        tip.style.top =(e.clientY-rectB.top)+"px";
-      });
+      rect.addEventListener("mousemove", placeTip);
       rect.addEventListener("mouseleave",()=>{ tip.style.display="none"; });
       svg.appendChild(rect);
 
       if(v>0 && cellW>=40 && cellH>=24){
         const t = document.createElementNS("http://www.w3.org/2000/svg","text");
-        t.setAttribute("x", x + cellW/2);
-        t.setAttribute("y", y + cellH/2 + 4);
-        t.setAttribute("text-anchor","middle");
-        t.setAttribute("class","tick");
-        t.textContent = v;
+        t.setAttribute("x", x + cellW/2); t.setAttribute("y", y + cellH/2 + 4);
+        t.setAttribute("text-anchor","middle"); t.setAttribute("class","tick"); t.textContent = v;
         svg.appendChild(t);
       }
     });
   });
   const diag=document.createElementNS("http://www.w3.org/2000/svg","line");
-  diag.setAttribute("x1", x0);
-  diag.setAttribute("y1", y0);
-  diag.setAttribute("x2", x1);
-  diag.setAttribute("y2", y1);
+  diag.setAttribute("x1", x0); diag.setAttribute("y1", y0);
+  diag.setAttribute("x2", x1); diag.setAttribute("y2", y1);
   diag.setAttribute("class","diag"); svg.appendChild(diag);
-
 }
 
 // --- Histogram of absolute differences ---------------------------------------
@@ -951,49 +850,47 @@ function drawHistogram(rows, aName="A", bName="B"){
   if(!rows || !rows.length){ setStatus(status,"No overlap yet."); sum.textContent=""; return; }
   setStatus(status,"");
 
-  const step = 0.5;
-  const bins = Array.from({length:10}, (_,i) => +(i*step).toFixed(1)); // 0..4.5
-  const counts = new Array(bins.length).fill(0);
-  rows.forEach(r => { const d = Math.abs(r.a - r.b); const idx = Math.round(d/step); if(idx >= 0 && idx < counts.length) counts[idx]++; });
-  const n = rows.length;
-  const props = counts.map(c => (100*c/n));
-  const maxPct  = Math.max(...props, 0);
-  const yMaxDyn = Math.min(100, Math.max(10, Math.ceil(maxPct/10)*10));
-    sum.textContent = `Exact ${props[0].toFixed(0)}% · ≤0.5★ ${(props[0]+props[1]).toFixed(0)}% · ≤1★ ${(props[0]+props[1]+props[2]).toFixed(0)}%`;
+  const step=0.5;
+  const bins=Array.from({length:10},(_,i)=>+(i*step).toFixed(1));
+  const counts=new Array(bins.length).fill(0);
+  rows.forEach(r=>{ const d=Math.abs(r.a-r.b); const idx=Math.round(d/step); if(idx>=0 && idx<counts.length) counts[idx]++; });
+  const n=rows.length, props=counts.map(c=>100*c/n);
+  const yMaxDyn=Math.min(100, Math.max(10, Math.ceil(Math.max(...props,0)/10)*10));
+  sum.textContent = `Exact ${props[0].toFixed(0)}% · ≤0.5★ ${(props[0]+props[1]).toFixed(0)}% · ≤1★ ${(props[0]+props[1]+props[2]).toFixed(0)}%`;
 
   const {xScale,yScale,x0,x1,y0,y1} =
-  gridAndTicks(svg, W, H, m,
-    0, 4.5,
-    0, yMaxDyn,
-    0.5, 10,
-    `|${aName}−${bName}| (★)`, "Share of titles (%)",
-    true, false);
+    gridAndTicks(svg, W, H, m, 0, 4.5, 0, yMaxDyn, 0.5, 10, `|${aName}−${bName}| (★)`, "Share of titles (%)", true, false);
 
-  const band = (x1 - x0) / bins.length;
-  const barW = band * 0.72;
+  const band=(x1-x0)/bins.length, barW=band*0.72;
 
-  bins.forEach((b, i) => {
-    const v = props[i];
-    const x = x0 + i * band + (band - barW) / 2;
-    const y = yScale(v);
-    const h = yScale(0) - y;
+  const wrap=$("#histWrap");
+  function placeTip(e){
+    const R=wrap.getBoundingClientRect();
+    const x=e.clientX-R.left+12, y=e.clientY-R.top+12;
+    const maxX=R.width-tip.offsetWidth-8, maxY=R.height-tip.offsetHeight-8;
+    tip.style.left=Math.max(8,Math.min(x,maxX))+"px";
+    tip.style.top =Math.max(8,Math.min(y,maxY))+"px";
+  }
 
-    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    rect.setAttribute("x", x); rect.setAttribute("y", y);
-    rect.setAttribute("width", barW); rect.setAttribute("height", Math.max(0, h));
-    rect.setAttribute("fill", "#666666");
-    rect.setAttribute("stroke", "#e0e0e0");
-    rect.addEventListener("mouseenter", ()=>{ tip.style.display="block"; tip.textContent = `|${aName}−${bName}| = ${b}★ → ${v.toFixed(1)}% (${counts[i]} films)`; });
-    rect.addEventListener("mousemove", e=>{ const rectW=$("#histWrap").getBoundingClientRect(); tip.style.left=(e.clientX-rectW.left)+"px"; tip.style.top=(e.clientY-rectW.top)+"px";});
-    rect.addEventListener("mouseleave", ()=>{ tip.style.display="none"; });
-    svg.appendChild(rect);
+  bins.forEach((b,i)=>{
+    const v=props[i];
+    const x=x0 + i*band + (band-barW)/2;
+    const y=yScale(v), h=yScale(0)-y;
 
-    if(v >= 0.5){
-      const t = document.createElementNS("http://www.w3.org/2000/svg","text");
-      t.setAttribute("x", x + barW/2); t.setAttribute("y", y - 6);
-      t.setAttribute("text-anchor", "middle"); t.setAttribute("class","tick");
-      t.textContent = v.toFixed(0) + "%";
-      svg.appendChild(t);
+    const r=document.createElementNS("http://www.w3.org/2000/svg","rect");
+    r.setAttribute("x",x); r.setAttribute("y",y);
+    r.setAttribute("width",barW); r.setAttribute("height",Math.max(0,h));
+    r.setAttribute("fill","#666666"); r.setAttribute("stroke","#e0e0e0");
+    r.addEventListener("mouseenter", ()=>{ tip.style.display="block"; tip.textContent=`|${aName}−${bName}| = ${b}★ → ${v.toFixed(1)}% (${counts[i]} films)`; });
+    r.addEventListener("mousemove", placeTip);
+    r.addEventListener("mouseleave", ()=>{ tip.style.display="none"; });
+    svg.appendChild(r);
+
+    if(v>=0.5){
+      const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+      t.setAttribute("x", x+barW/2); t.setAttribute("y", y-6);
+      t.setAttribute("text-anchor","middle"); t.setAttribute("class","tick");
+      t.textContent = v.toFixed(0) + "%"; svg.appendChild(t);
     }
   });
 }
@@ -1183,7 +1080,6 @@ function drawYearBars(svgEl, yearCounts, label){
   svgEl.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svgEl.innerHTML = "";
 
-  // axis baseline + end ticks
   const gAxis = document.createElementNS(svgNS,"g");
   const base = document.createElementNS(svgNS,"line");
   base.setAttribute("x1", padL); base.setAttribute("y1", padT+innerH);
@@ -1201,8 +1097,6 @@ function drawYearBars(svgEl, yearCounts, label){
   t2.textContent = years[years.length-1]; gAxis.appendChild(t2);
   svgEl.appendChild(gAxis);
 
-  // LEFT→RIGHT histogram gradient spanning the whole plot area
-  // Stops: #007FFF → #ff1fab → #bf430b
   const defs = document.createElementNS(svgNS,"defs");
   const grad = document.createElementNS(svgNS,"linearGradient");
   grad.setAttribute("id","yearGrad");
@@ -1211,75 +1105,64 @@ function drawYearBars(svgEl, yearCounts, label){
   grad.setAttribute("y1", "0");
   grad.setAttribute("x2", String(padL+innerW));
   grad.setAttribute("y2", "0");
-  const mkStop = (off, col) => {
-    const s = document.createElementNS(svgNS,"stop");
-    s.setAttribute("offset", off);
-    s.setAttribute("stop-color", col);
-    return s;
-  };
-  grad.appendChild(mkStop("0%","#007FFF"));
-  grad.appendChild(mkStop("50%","#ff1fab"));
-  grad.appendChild(mkStop("100%","#bf430b"));
-  defs.appendChild(grad);
-  svgEl.appendChild(defs);
+  [["0%","#007FFF"],["50%","#ff1fab"],["100%","#bf430b"]].forEach(([o,c])=>{
+    const s=document.createElementNS(svgNS,"stop"); s.setAttribute("offset",o); s.setAttribute("stop-color",c); grad.appendChild(s);
+  });
+  defs.appendChild(grad); svgEl.appendChild(defs);
 
-  // categorical X so bars + hits align tightly
-  const n = years.length;
-  const step = innerW / n;
-  const bw = Math.max(6, step*0.98); // tight gaps
+  const n=years.length, step=innerW/n;
+  const bw = Math.max(6, step*0.98);
   const centers = years.map((_,i)=> padL + (i+0.5)*step);
 
-  // bars
-  for (let i=0; i<n; i++){
-    const y = years[i], c = yearCounts[y]||0, cx = centers[i];
-    const rect = document.createElementNS(svgNS,"rect");
-    rect.setAttribute("class","bar");
-    rect.setAttribute("x", cx - bw/2);
-    rect.setAttribute("y", yScale(c));
-    rect.setAttribute("width", bw);
-    rect.setAttribute("height", Math.max(0, padT+innerH - yScale(c)));
-    rect.setAttribute("rx","3");
-    rect.setAttribute("fill","url(#yearGrad)");
-    rect.setAttribute("opacity","0.95");
-    svgEl.appendChild(rect);
+  for (let i=0;i<n;i++){
+    const y=years[i], c=yearCounts[y]||0, cx=centers[i];
+    const r=document.createElementNS(svgNS,"rect");
+    r.setAttribute("x", cx-bw/2); r.setAttribute("y", yScale(c));
+    r.setAttribute("width", bw); r.setAttribute("height", Math.max(0, padT+innerH - yScale(c)));
+    r.setAttribute("rx","3"); r.setAttribute("fill","url(#yearGrad)"); r.setAttribute("opacity","0.95");
+    svgEl.appendChild(r);
   }
 
-  // label
   const chip = document.createElementNS(svgNS,"text");
   chip.setAttribute("x", 56); chip.setAttribute("y", 16);
-  chip.setAttribute("fill","var(--muted)");
-  chip.setAttribute("style","font:12px Inter, system-ui");
+  chip.setAttribute("fill","var(--muted)"); chip.setAttribute("style","font:12px Inter, system-ui");
   chip.textContent = label; svgEl.appendChild(chip);
 
-  // tooltip + hit bands
   const tipEl = document.getElementById("yearTip");
-  function showYearTip(yVal, cVal, ev){
-    tipEl.style.display="block";
-    tipEl.textContent = `${yVal}: ${cVal}`;
-    const r = svgEl.getBoundingClientRect();
-    tipEl.style.left = `${ev.clientX - r.left + 12}px`;
-    tipEl.style.top  = `${ev.clientY - r.top  + 12}px`;
+  const wrap = document.getElementById("panelY");
+  function placeTip(ev){
+    const R = wrap.getBoundingClientRect();
+    const x = ev.clientX - R.left + 12;
+    const y = ev.clientY - R.top  + 12;
+    const maxX = R.width  - tipEl.offsetWidth  - 8;
+    const maxY = R.height - tipEl.offsetHeight - 8;
+    tipEl.style.left = Math.max(8, Math.min(x, maxX)) + "px";
+    tipEl.style.top  = Math.max(8, Math.min(y, maxY)) + "px";
   }
-  function hideYearTip(){ tipEl.style.display = "none"; }
+  function showYearTip(year, cnt, ev){
+    tipEl.style.display="block";
+    tipEl.textContent = `${year}: ${cnt}`;
+    placeTip(ev);
+  }
+  function hideYearTip(){ tipEl.style.display="none"; }
 
-  for (let i=0; i<n; i++){
-    const y = years[i], c = yearCounts[y]||0, cx = centers[i];
-    const hit = document.createElementNS(svgNS,"rect");
+  for (let i=0;i<n;i++){
+    const y=years[i], c=yearCounts[y]||0, cx=centers[i];
+    const hit=document.createElementNS(svgNS,"rect");
     hit.setAttribute("class","hit");
-    hit.setAttribute("x", cx - step/2);
-    hit.setAttribute("y", padT);
-    hit.setAttribute("width", step);
-    hit.setAttribute("height", innerH);
+    hit.setAttribute("x", cx-step/2); hit.setAttribute("y", padT);
+    hit.setAttribute("width", step);  hit.setAttribute("height", innerH);
     hit.setAttribute("fill","rgba(0,0,0,0.001)");
-    hit.addEventListener("pointerenter", ev => showYearTip(y, c, ev));
-    hit.addEventListener("click",        ev => showYearTip(y, c, ev)); // iOS
+    hit.addEventListener("pointerenter", ev=>showYearTip(y,c,ev));
+    hit.addEventListener("pointermove",  ev=>placeTip(ev));
+    hit.addEventListener("pointerdown",  ev=>showYearTip(y,c,ev));
     hit.addEventListener("pointerleave", hideYearTip);
     svgEl.appendChild(hit);
   }
 
-  document.addEventListener("pointerdown", e => {
-    if (!e.target.closest("#panelY .hit")) hideYearTip();
-  }, { capture:true });
+  document.addEventListener("pointerdown", e=>{
+    if(!e.target.closest("#panelY .hit")) hideYearTip();
+  }, {capture:true});
 }
   
 </script>
