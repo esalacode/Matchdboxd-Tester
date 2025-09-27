@@ -944,10 +944,17 @@ function drawHistogram(rows, aName="A", bName="B"){
     rect.setAttribute("width", bw); rect.setAttribute("height", (h/maxH)*innerH);
     rect.setAttribute("fill", "#2a3745");
     rect.addEventListener("mousemove", (ev)=>{
-      tip.style.display="block";
-      tip.textContent = `${d.user}: ${h.toFixed(2)} hours (${d.minutes} min)`;
-      tip.style.left = (ev.clientX+12)+"px"; tip.style.top = (ev.clientY+12)+"px";
-    });
+  const wrap = $("#watchWrap");
+  const R = wrap.getBoundingClientRect();
+  tip.style.display = "block";
+  tip.textContent = `${d.user}: ${h.toFixed(2)} hours (${d.minutes} min)`;
+  const x = ev.clientX - R.left + 12;
+  const y = ev.clientY - R.top  + 12;
+  const maxX = R.width  - tip.offsetWidth  - 8;
+  const maxY = R.height - tip.offsetHeight - 8;
+  tip.style.left = Math.max(8, Math.min(x, maxX)) + "px";
+  tip.style.top  = Math.max(8, Math.min(y, maxY)) + "px";
+});
     rect.addEventListener("mouseleave", ()=>{ tip.style.display="none"; });
     svg.appendChild(rect);
 
