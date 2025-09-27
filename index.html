@@ -1156,7 +1156,7 @@ function drawYearBars(svgEl, yearCounts, label){
     hit.addEventListener("pointerenter", ev=>showYearTip(y,c,ev));
     hit.addEventListener("pointermove",  ev=>placeTip(ev));
     hit.addEventListener("pointerdown",  ev=>showYearTip(y,c,ev));
-    hit.addEventListener("pointerleave", hideYearTip);
+    hit.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") hideYearTip(); });
     svgEl.appendChild(hit);
   }
 
