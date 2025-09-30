@@ -789,14 +789,14 @@ function drawHeatmap(rows, aName="A", bName="B"){
   const padY   = (bandY - cellH) / 2;
 
   function color(t){
-    const stops = [{p:0.0,c:[0,127,255]},{p:0.5,c:[191,67,11]},{p:1.0,c:[255,31,171]}];
+    const stops = [{p:0.0,c:[0,127,255]},{p:0.5,c:[255,31,171]},{p:1.0,c:[191,67,11]}];
     const v=Math.max(0,Math.min(1,t)); let i=0; while(i<stops.length-1 && v>stops[i+1].p) i++;
     const a=stops[i], b=stops[i+1], u=(v-a.p)/(b.p-a.p||1);
     const R=Math.round(a.c[0]+(b.c[0]-a.c[0])*u);
     const G=Math.round(a.c[1]+(b.c[1]-a.c[1])*u);
     const B=Math.round(a.c[2]+(b.c[2]-a.c[2])*u);
     return `rgb(${R},${G},${B})`;
-  }
+}
 
   const wrap=$("#heatWrap");
   function placeTip(e){
