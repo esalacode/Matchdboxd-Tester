@@ -1010,8 +1010,17 @@ function updateAllViews(){
 
 async function runBoth(){
   const status = $("#statusO");
-  const uA = normUser($("#userA").value);
-  const uB = normUser($("#userB").value);
+  let uA = normUser($("#userA").value);
+  let uB = normUser($("#userB").value);
+
+  // If both empty, auto-fill defaults
+  if(!uA && !uB){
+    uA = "eddieslb";
+    uB = "steedmanson";
+    $("#userA").value = uA;
+    $("#userB").value = uB;
+  }
+
   if(!uA || !uB){ setStatus(status,"Enter two valid usernames.", true); return; }
 
   showLoadingBar();
