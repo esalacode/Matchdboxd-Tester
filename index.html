@@ -27,7 +27,36 @@ body { margin:0; font-family:"Inter", system-ui, -apple-system, "Segoe UI", Robo
 header { padding:16px; border-bottom:1px solid var(--grid); display:flex; align-items:center; justify-content:space-between; gap:12px;}
 header h1 { font-size:18px; margin:0;}
 .top-actions { display:flex; gap:8px; align-items:center; }
-.top-actions input[type=text]{ width:220px; padding:10px 12px; border:1px solid #c9cdd3; background:#ffffff; color:#000000; outline:none;}
+/* Softer, pill-style inputs (Amazon/Google-like) */
+.top-actions input[type=text]{
+  width:clamp(200px,26vw,320px);
+  padding:10px 14px;
+  border:1px solid #D4DAE2;
+  background:#F6F8FB;       /* off-white to avoid harsh contrast */
+  color:#0A0F14;
+  border-radius:9999px;      /* pill */
+  line-height:1.2;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(12,20,28,.08);
+  transition:border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+  outline:0;
+}
+.top-actions input[type=text]::placeholder{
+  color:#8893A3;             /* soft gray like examples */
+  opacity:1;
+}
+.top-actions input[type=text]:hover{
+  border-color:#B8C1CC;
+  background:#F9FAFC;
+}
+.top-actions input[type=text]:focus{
+  border-color:#007FFF;      /* your brand blue */
+  background:#FFFFFF;
+  box-shadow:0 0 0 3px rgba(0,127,255,.15), inset 0 1px 0 rgba(255,255,255,.6);
+  outline:0;
+}
+@media (max-width:560px){
+  .top-actions input[type=text]{ width:100%; max-width:none; }
+}
 .top-actions input::placeholder{ color:#6a7b89;}
 
 
