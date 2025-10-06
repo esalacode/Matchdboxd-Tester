@@ -81,6 +81,13 @@ th,td{ padding:10px 8px; border-bottom:1px solid var(--grid); font-size:14px;}
 }
 .sort-btn.sorted{ color:#c8d0d9; }
 .sort-btn .arrow{ font-size:10px; opacity:.85; }
+
+.avatar-24{
+  width:24px; height:24px; border-radius:50%;
+  object-fit:cover; display:inline-block; vertical-align:middle;
+  border:1px solid rgba(255,255,255,.08);
+}  
+  
 th{ text-align:left; color:var(--muted); font-weight:600;}
 .num{ text-align:right; font-variant-numeric: tabular-nums;}
 footer{ color:#6a7b89; text-align:center; font-size:12px; padding:12px 0 32px;}
@@ -261,13 +268,19 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
   <thead>
     <tr>
       <th style="width:60%">
-        <button class="sort-btn" data-key="title" aria-label="Sort by title">Title <span class="arrow"></span></button>
+        <button class="sort-btn" data-key="title" aria-label="Sort by title">
+          Title <span class="arrow"></span>
+        </button>
       </th>
       <th class="num" style="width:20%">
-        <button class="sort-btn" data-key="a" aria-label="Sort by A rating">A rating <span class="arrow"></span></button>
+        <button class="sort-btn" data-key="a" aria-label="Sort by A's rating">
+          <img id="hdrA" class="avatar-24" src="" alt="A"><span class="arrow"></span>
+        </button>
       </th>
       <th class="num" style="width:20%">
-        <button class="sort-btn" data-key="b" aria-label="Sort by B rating">B rating <span class="arrow"></span></button>
+        <button class="sort-btn" data-key="b" aria-label="Sort by B's rating">
+          <img id="hdrB" class="avatar-24" src="" alt="B"><span class="arrow"></span>
+        </button>
       </th>
     </tr>
   </thead>
@@ -1293,11 +1306,31 @@ function attachMutualSortHandlers(){
 (function(){
   const _update = updateAllViews;
   updateAllViews = function(){
-    _update();              // renders rows as usual
-    attachMutualSortHandlers(); // ensure handlers exist
-    applyMutualSort();          // then sort per current state
+    _update();
+    attachMutualSortHandlers();
+    applyMutualSort();
+    setMutualHeaderAvatars();
   };
 })();
+
+function setMutualHeaderAvatars(){
+  const aImg = document.getElementById("hdrA");
+  const bImg = document.getElementById("hdrB");
+  if(!aImg || !bImg) return;
+
+  // Reuse avatars already on the page if present
+  const srcA = document.querySelector('#userAAvatar, #picA, .userA img.avatar, .user-a img.avatar')?.src;
+  const srcB = document.querySelector('#userBAvatar, #picB, .userB img.avatar, .user-b img.avatar')?.src;
+  if(srcA) aImg.src = srcA;
+  if(srcB) bImg.src = srcB;
+
+  // Names for accessibility/tooltips
+  const nameA = document.querySelector('[data-user="A"], .userA .name, .user-a .name, #userA')?.textContent || document.querySelector('#userA')?.value || 'A';
+  const nameB = document.querySelector('[data-user="B"], .userB .name, .user-b .name, #userB')?.textContent || document.querySelector('#userB')?.value || 'B';
+  aImg.title = nameA; bImg.title = nameB;
+  document.querySelector('#tblO [data-key="a"]')?.setAttribute('aria-label', `Sort by ${nameA}'s rating`);
+  document.querySelector('#tblO [data-key="b"]')?.setAttribute('aria-label', `Sort by ${nameB}'s rating`);
+}  
   
 </script>
 </body>
