@@ -1313,24 +1313,36 @@ function attachMutualSortHandlers(){
   };
 })();
 
-function setMutualHeaderAvatars(){
+// Fetch and set header avatars based on current input usernames.
+const _avatarCache = new Map();
+async function fetchAvatar(user){
+  if(!user) return null;
+  if(_avatarCache.has(user)) return _avatarCache.get(user);
+  try{
+    const r = await fetch(`/api/avatar?user=${encodeURIComponent(user)}`);
+    const j = await r.json();
+    const url = (j && j.avatar) || null;
+    _avatarCache.set(user, url);
+    return url;
+  }catch{ return null; }
+}
+
+async function setMutualHeaderAvatars(){
   const aImg = document.getElementById("hdrA");
   const bImg = document.getElementById("hdrB");
   if(!aImg || !bImg) return;
 
-  // Reuse avatars already on the page if present
-  const srcA = document.querySelector('#userAAvatar, #picA, .userA img.avatar, .user-a img.avatar')?.src;
-  const srcB = document.querySelector('#userBAvatar, #picB, .userB img.avatar, .user-b img.avatar')?.src;
+  const nameA = (document.getElementById("userA").value||"A").trim()||"A";
+  const nameB = (document.getElementById("userB").value||"B").trim()||"B";
+  aImg.title = nameA; bImg.title = nameB;
+
+  const [srcA, srcB] = await Promise.all([fetchAvatar(nameA), fetchAvatar(nameB)]);
   if(srcA) aImg.src = srcA;
   if(srcB) bImg.src = srcB;
 
-  // Names for accessibility/tooltips
-  const nameA = document.querySelector('[data-user="A"], .userA .name, .user-a .name, #userA')?.textContent || document.querySelector('#userA')?.value || 'A';
-  const nameB = document.querySelector('[data-user="B"], .userB .name, .user-b .name, #userB')?.textContent || document.querySelector('#userB')?.value || 'B';
-  aImg.title = nameA; bImg.title = nameB;
   document.querySelector('#tblO [data-key="a"]')?.setAttribute('aria-label', `Sort by ${nameA}'s rating`);
   document.querySelector('#tblO [data-key="b"]')?.setAttribute('aria-label', `Sort by ${nameB}'s rating`);
-}  
+}
   
 </script>
 </body>
