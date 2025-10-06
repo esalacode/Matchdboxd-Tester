@@ -69,6 +69,18 @@ label { display:block; font-size:14px; color:var(--muted); margin-bottom:6px;}
 .small{ font-size:12px; color:var(--muted);}
 table{ width:100%; border-collapse:collapse; margin-top:12px;}
 th,td{ padding:10px 8px; border-bottom:1px solid var(--grid); font-size:14px;}
+  /* sortable table header buttons */
+.sort-btn{
+  all:unset;
+  cursor:pointer;
+  font:inherit;
+  color:var(--muted);
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.sort-btn.sorted{ color:#c8d0d9; }
+.sort-btn .arrow{ font-size:10px; opacity:.85; }
 th{ text-align:left; color:var(--muted); font-weight:600;}
 .num{ text-align:right; font-variant-numeric: tabular-nums;}
 footer{ color:#6a7b89; text-align:center; font-size:12px; padding:12px 0 32px;}
@@ -244,10 +256,24 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 <div class="small" id="summaryO"></div>
 </div>
 <div id="statusO" class="status"></div>
+  
 <table id="tblO" hidden>
-<thead><tr><th style="width:60%">Title</th><th class="num" style="width:20%">A rating</th><th class="num" style="width:20%">B rating</th></tr></thead>
-<tbody></tbody>
+  <thead>
+    <tr>
+      <th style="width:60%">
+        <button class="sort-btn" data-key="title" aria-label="Sort by title">Title <span class="arrow"></span></button>
+      </th>
+      <th class="num" style="width:20%">
+        <button class="sort-btn" data-key="a" aria-label="Sort by A rating">A rating <span class="arrow"></span></button>
+      </th>
+      <th class="num" style="width:20%">
+        <button class="sort-btn" data-key="b" aria-label="Sort by B rating">B rating <span class="arrow"></span></button>
+      </th>
+    </tr>
+  </thead>
+  <tbody></tbody>
 </table>
+  
 <div class="small" id="stats"></div>
 </section>
 </div>
@@ -1209,6 +1235,69 @@ function drawYearBars(svgEl, yearCounts, label){
     if(!e.target.closest("#panelY .hit")) hideYearTip();
   }, {capture:true});
 }
+
+// --- Mutual Movies sorting ---
+const MUTUAL_SORT = { key: "title", dir: 1 }; // dir: 1 = ascending, -1 = descending
+
+function applyMutualSort(){
+  const tbody = document.querySelector("#tblO tbody");
+  if(!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+
+  const getVal = (tr, key) => {
+    if(key==="title") return tr.children[0].textContent.trim().toLowerCase();
+    if(key==="a")     return parseFloat(tr.children[1].textContent) || 0;
+    if(key==="b")     return parseFloat(tr.children[2].textContent) || 0;
+    return 0;
+  };
+
+  rows.sort((r1, r2) => {
+    const v1 = getVal(r1, MUTUAL_SORT.key);
+    const v2 = getVal(r2, MUTUAL_SORT.key);
+    if(MUTUAL_SORT.key === "title"){
+      return v1.localeCompare(v2, "en", {sensitivity:"base"}) * MUTUAL_SORT.dir;
+    }
+    return (v1 - v2) * MUTUAL_SORT.dir;
+  });
+
+  rows.forEach(r => tbody.appendChild(r));
+  updateSortIndicators();
+}
+
+function updateSortIndicators(){
+  document.querySelectorAll("#tblO thead .sort-btn").forEach(btn => {
+    const active = btn.dataset.key === MUTUAL_SORT.key;
+    btn.classList.toggle("sorted", active);
+    const arrow = btn.querySelector(".arrow");
+    arrow.textContent = active ? (MUTUAL_SORT.dir === 1 ? "▲" : "▼") : "";
+    btn.setAttribute("aria-sort", active ? (MUTUAL_SORT.dir === 1 ? "ascending" : "descending") : "none");
+  });
+}
+
+function attachMutualSortHandlers(){
+  document.querySelectorAll("#tblO thead .sort-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const k = btn.dataset.key;
+      if(MUTUAL_SORT.key === k){
+        MUTUAL_SORT.dir *= -1;       // toggle
+      } else {
+        MUTUAL_SORT.key = k;
+        MUTUAL_SORT.dir = 1;         // start ascending on new key
+      }
+      applyMutualSort();
+    });
+  });
+}
+
+// Patch updateAllViews so the table always respects the current sort.
+(function(){
+  const _update = updateAllViews;
+  updateAllViews = function(){
+    _update();              // renders rows as usual
+    attachMutualSortHandlers(); // ensure handlers exist
+    applyMutualSort();          // then sort per current state
+  };
+})();
   
 </script>
 </body>
