@@ -1156,7 +1156,11 @@ function drawYearBars(svgEl, yearCounts, label){
   const W=1200, H=220, padL=56, padR=24, padT=24, padB=36;
   const innerW=W-padL-padR, innerH=H-padT-padB;
 
-  const years = Object.keys(yearCounts||{}).map(x=>+x).sort((a,b)=>a-b);
+  const allYears = Object.keys(yearCounts||{}).map(x=>+x).sort((a,b)=>a-b);
+  let startIdx = 0, endIdx = allYears.length - 1;
+  while (startIdx <= endIdx && ((yearCounts[allYears[startIdx]]||0) === 0)) startIdx++;
+  while (endIdx >= startIdx && ((yearCounts[allYears[endIdx]]||0) === 0)) endIdx--;
+  const years = startIdx <= endIdx ? allYears.slice(startIdx, endIdx + 1) : [];
   if (years.length===0){ svgEl.innerHTML=""; return; }
   const maxCnt = Math.max(1, ...years.map(y=>yearCounts[y]||0));
   const yScale = c => padT + innerH - (c/maxCnt)*innerH;
