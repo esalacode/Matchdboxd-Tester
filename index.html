@@ -150,6 +150,51 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 .hit { cursor:pointer; touch-action:pan-y; pointer-events:all; }
 .bar:hover { opacity:.9 }
 #panelY { position:relative; } /* tooltip positioning context */
+
+/* Ratings animation panel */
+#panelS { position:relative; }
+#starAnimWrap { margin-top:4px; }
+.star-row{
+  display:flex;
+  align-items:flex-end;
+  gap:8px;
+  margin-top:8px;
+}
+.star-user-label{
+  width:72px;
+  font-size:12px;
+  color:var(--muted);
+}
+.star-bars{
+  flex:1;
+  display:flex;
+  align-items:flex-end;
+  gap:4px;
+  height:72px;
+}
+.star-bar{
+  flex:1;
+  border-radius:3px 3px 0 0;
+  background:linear-gradient(180deg,#7dd3fc,#a7f3d0);
+  min-height:3%;
+  transition:height .12s ease-out;
+}
+#starAnimStep{
+  margin-top:8px;
+}
+#starReplay{
+  margin-top:8px;
+  padding:6px 14px;
+  border-radius:9999px;
+  border:1px solid var(--grid);
+  background:#1f2933;
+  color:var(--fg);
+  font-size:12px;
+  cursor:pointer;
+}
+#starReplay:hover{
+  background:#253341;
+}
   
 </style>
 </head>
@@ -219,6 +264,27 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 <svg id="histSVG" class="svg" viewBox="0 0 700 500"></svg>
 <div id="histTip" class="tooltip"></div>
 </div>
+</section>
+
+  <!-- Ratings Animation panel -->
+<section class="card" id="panelS">
+  <div class="row" style="justify-content:space-between; align-items:center">
+    <label>Ratings Animation</label>
+    <div class="small" id="summaryS"></div>
+  </div>
+  <div id="statusS" class="status"></div>
+  <div id="starAnimWrap">
+    <div class="star-row">
+      <div class="star-user-label" id="starUserA">User A</div>
+      <div class="star-bars" id="starBarsA"></div>
+    </div>
+    <div class="star-row">
+      <div class="star-user-label" id="starUserB">User B</div>
+      <div class="star-bars" id="starBarsB"></div>
+    </div>
+    <div class="small" id="starAnimStep"></div>
+    <button id="starReplay" type="button">Replay</button>
+  </div>
 </section>
 
   <section class="card" id="panelT">
@@ -1043,6 +1109,139 @@ function drawHistogram(rows, aName="A", bName="B"){
   sum.textContent = `Total: ${total.toFixed(2)} hours across both users`;
 }
 
+// --- Star animation (ratings curve over time) -------------------------------
+const STAR_BINS = [0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0];
+let starAnimTimer = null;
+let starDomReady = false;
+
+function prepareStarSequence(list){
+  if (!Array.isArray(list) || !list.length) return [];
+  const ratings = list
+    .map(it => (typeof it.rating === "number" ? it.rating : null))
+    .filter(v => v !== null && isFinite(v))
+    .map(v => Math.max(0.5, Math.min(5.0, v)));
+  // ratings API is newest → oldest; reverse so we animate oldest → newest
+  ratings.reverse();
+  return ratings;
+}
+
+function ratingToBinIndex(r){
+  const step = 0.5;
+  const idx = Math.round((r - 0.5) / step);
+  return (idx >= 0 && idx < STAR_BINS.length) ? idx : -1;
+}
+
+function ensureStarDom(){
+  if (starDomReady) return;
+  const wrapA = document.getElementById("starBarsA");
+  const wrapB = document.getElementById("starBarsB");
+  if (!wrapA || !wrapB) return;
+  wrapA.innerHTML = "";
+  wrapB.innerHTML = "";
+  STAR_BINS.forEach(() => {
+    const a = document.createElement("div");
+    a.className = "star-bar";
+    a.style.height = "4%";
+    wrapA.appendChild(a);
+    const b = document.createElement("div");
+    b.className = "star-bar";
+    b.style.height = "4%";
+    wrapB.appendChild(b);
+  });
+  starDomReady = true;
+}
+
+function updateStarBars(countsA, countsB){
+  const barsA = document.querySelectorAll("#starBarsA .star-bar");
+  const barsB = document.querySelectorAll("#starBarsB .star-bar");
+  if (!barsA.length || !barsB.length) return;
+  const maxCount = Math.max(1, ...countsA, ...countsB);
+  barsA.forEach((el, i) => {
+    const c = countsA[i] || 0;
+    const h = maxCount ? (c / maxCount) * 100 : 0;
+    el.style.height = (h || 4) + "%";
+  });
+  barsB.forEach((el, i) => {
+    const c = countsB[i] || 0;
+    const h = maxCount ? (c / maxCount) * 100 : 0;
+    el.style.height = (h || 4) + "%";
+  });
+}
+
+function startStarAnimation(){
+  const status   = document.getElementById("statusS");
+  const summary  = document.getElementById("summaryS");
+  const stepLabel= document.getElementById("starAnimStep");
+  const nameAEl  = document.getElementById("starUserA");
+  const nameBEl  = document.getElementById("starUserB");
+
+  if (!status || !summary) return;
+
+  const seqA = prepareStarSequence(lastA);
+  const seqB = prepareStarSequence(lastB);
+  const total = Math.max(seqA.length, seqB.length);
+
+  const aName = (document.getElementById("userA").value || "A").trim() || "A";
+  const bName = (document.getElementById("userB").value || "B").trim() || "B";
+  if (nameAEl) nameAEl.textContent = aName;
+  if (nameBEl) nameBEl.textContent = bName;
+
+  if (starAnimTimer){
+    clearInterval(starAnimTimer);
+    starAnimTimer = null;
+  }
+  ensureStarDom();
+
+  if (!total){
+    status.textContent = "Need ratings from at least one user.";
+    summary.textContent = "";
+    updateStarBars(
+      new Array(STAR_BINS.length).fill(0),
+      new Array(STAR_BINS.length).fill(0)
+    );
+    if (stepLabel) stepLabel.textContent = "";
+    return;
+  }
+
+  status.textContent = "";
+  summary.textContent = `${total} ratings (oldest → newest)`;
+
+  const countsA = new Array(STAR_BINS.length).fill(0);
+  const countsB = new Array(STAR_BINS.length).fill(0);
+  let i = 0;
+  const stepSize = Math.max(1, Math.floor(total / 120)); // ~120 frames
+
+  function tick(){
+    for (let k = 0; k < stepSize && i < total; k++){
+      if (i < seqA.length){
+        const idxA = ratingToBinIndex(seqA[i]);
+        if (idxA >= 0) countsA[idxA]++;
+      }
+      if (i < seqB.length){
+        const idxB = ratingToBinIndex(seqB[i]);
+        if (idxB >= 0) countsB[idxB]++;
+      }
+      i++;
+    }
+    updateStarBars(countsA, countsB);
+    if (stepLabel) stepLabel.textContent = `Step ${i} / ${total}`;
+    if (i >= total){
+      clearInterval(starAnimTimer);
+      starAnimTimer = null;
+    }
+  }
+
+  tick();
+  starAnimTimer = setInterval(tick, 80);
+
+  const replayBtn = document.getElementById("starReplay");
+  if (replayBtn && !replayBtn._bound){
+    replayBtn._bound = true;
+    replayBtn.addEventListener("click", () => {
+      startStarAnimation();
+    });
+  }
+}
   
 // --- Orchestration ------------------------------------------------------------
 function updateAllViews(){
@@ -1306,7 +1505,7 @@ function attachMutualSortHandlers(){
   });
 }
 
-// Patch updateAllViews so the table always respects the current sort.
+// Patch updateAllViews so the table always respects the current sort and extras.
 (function(){
   const _update = updateAllViews;
   updateAllViews = function(){
@@ -1314,6 +1513,7 @@ function attachMutualSortHandlers(){
     attachMutualSortHandlers();
     applyMutualSort();
     setMutualHeaderAvatars();
+    startStarAnimation();  // NEW: animate ratings curve
   };
 })();
 
