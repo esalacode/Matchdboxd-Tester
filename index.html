@@ -1192,13 +1192,12 @@ function startStarAnimation(){
   }
   ensureStarDom();
 
+  const emptyCounts = new Array(STAR_BINS.length).fill(0);
+
   if (!total){
     status.textContent = "Need ratings from at least one user.";
     summary.textContent = "";
-    updateStarBars(
-      new Array(STAR_BINS.length).fill(0),
-      new Array(STAR_BINS.length).fill(0)
-    );
+    updateStarBars(emptyCounts, emptyCounts);
     if (stepLabel) stepLabel.textContent = "";
     return;
   }
@@ -1209,10 +1208,14 @@ function startStarAnimation(){
   const countsA = new Array(STAR_BINS.length).fill(0);
   const countsB = new Array(STAR_BINS.length).fill(0);
   let i = 0;
-  const stepSize = Math.max(1, Math.floor(total / 120)); // ~120 frames
+  const stepSize = 1; // exactly one rating per tick
+
+  // initial empty frame
+  updateStarBars(emptyCounts, emptyCounts);
+  if (stepLabel) stepLabel.textContent = `Step 0 / ${total}`;
 
   function tick(){
-    for (let k = 0; k < stepSize && i < total; k++){
+    if (i < total){
       if (i < seqA.length){
         const idxA = ratingToBinIndex(seqA[i]);
         if (idxA >= 0) countsA[idxA]++;
@@ -1221,18 +1224,17 @@ function startStarAnimation(){
         const idxB = ratingToBinIndex(seqB[i]);
         if (idxB >= 0) countsB[idxB]++;
       }
-      i++;
+      i += stepSize;
+      updateStarBars(countsA, countsB);
+      if (stepLabel) stepLabel.textContent = `Step ${i} / ${total}`;
     }
-    updateStarBars(countsA, countsB);
-    if (stepLabel) stepLabel.textContent = `Step ${i} / ${total}`;
     if (i >= total){
       clearInterval(starAnimTimer);
       starAnimTimer = null;
     }
   }
 
-  tick();
-  starAnimTimer = setInterval(tick, 80);
+  starAnimTimer = setInterval(tick, 80); // tweak 80 for slower/faster
 
   const replayBtn = document.getElementById("starReplay");
   if (replayBtn && !replayBtn._bound){
