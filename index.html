@@ -214,6 +214,30 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 </div>
 <div class="grid">
 
+<!-- Ratings Animation panel -->
+<section class="card" id="panelS">
+  <div class="row" style="justify-content:space-between; align-items:center">
+    <label>Ratings Animation</label>
+    <div class="small" id="summaryS"></div>
+  </div>
+  <div id="statusS" class="status"></div>
+  <div id="starAnimWrap">
+    <div class="star-row">
+      <div class="star-user-label" id="starUserA">User A</div>
+      <div class="star-bars" id="starBarsA"></div>
+    </div>
+    <div class="small star-progress" id="starProgressA"></div>
+
+    <div class="star-row">
+      <div class="star-user-label" id="starUserB">User B</div>
+      <div class="star-bars" id="starBarsB"></div>
+    </div>
+    <div class="small star-progress" id="starProgressB"></div>
+
+    <button id="starReplay" type="button">Replay</button>
+  </div>
+</section>
+
 <!-- By Year panel -->
 <section class="card" id="panelY">
   <div class="row" style="justify-content:space-between; align-items:center">
@@ -264,30 +288,6 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 <svg id="histSVG" class="svg" viewBox="0 0 700 500"></svg>
 <div id="histTip" class="tooltip"></div>
 </div>
-</section>
-
-  <!-- Ratings Animation panel -->
-<section class="card" id="panelS">
-  <div class="row" style="justify-content:space-between; align-items:center">
-    <label>Ratings Animation</label>
-    <div class="small" id="summaryS"></div>
-  </div>
-  <div id="statusS" class="status"></div>
-  <div id="starAnimWrap">
-    <div class="star-row">
-      <div class="star-user-label" id="starUserA">User A</div>
-      <div class="star-bars" id="starBarsA"></div>
-    </div>
-    <div class="small star-progress" id="starProgressA"></div>
-
-    <div class="star-row">
-      <div class="star-user-label" id="starUserB">User B</div>
-      <div class="star-bars" id="starBarsB"></div>
-    </div>
-    <div class="small star-progress" id="starProgressB"></div>
-
-    <button id="starReplay" type="button">Replay</button>
-  </div>
 </section>
 
   <section class="card" id="panelT">
