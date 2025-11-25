@@ -179,8 +179,8 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
   min-height:3%;
   transition:height .12s ease-out;
 }
-#starAnimStep{
-  margin-top:8px;
+.star-progress{
+  margin-top:4px;
 }
 #starReplay{
   margin-top:8px;
@@ -278,11 +278,14 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
       <div class="star-user-label" id="starUserA">User A</div>
       <div class="star-bars" id="starBarsA"></div>
     </div>
+    <div class="small star-progress" id="starProgressA"></div>
+
     <div class="star-row">
       <div class="star-user-label" id="starUserB">User B</div>
       <div class="star-bars" id="starBarsB"></div>
     </div>
-    <div class="small" id="starAnimStep"></div>
+    <div class="small star-progress" id="starProgressB"></div>
+
     <button id="starReplay" type="button">Replay</button>
   </div>
 </section>
@@ -1169,17 +1172,21 @@ function updateStarBars(countsA, countsB){
 }
 
 function startStarAnimation(){
-  const status   = document.getElementById("statusS");
-  const summary  = document.getElementById("summaryS");
-  const stepLabel= document.getElementById("starAnimStep");
-  const nameAEl  = document.getElementById("starUserA");
-  const nameBEl  = document.getElementById("starUserB");
+  const status    = document.getElementById("statusS");
+  const summary   = document.getElementById("summaryS");
+  const nameAEl   = document.getElementById("starUserA");
+  const nameBEl   = document.getElementById("starUserB");
+  const progAEl   = document.getElementById("starProgressA");
+  const progBEl   = document.getElementById("starProgressB");
 
   if (!status || !summary) return;
 
   const seqA = prepareStarSequence(lastA);
   const seqB = prepareStarSequence(lastB);
-  const total = Math.max(seqA.length, seqB.length);
+
+  const totalA = seqA.length;
+  const totalB = seqB.length;
+  const totalSteps = Math.max(totalA, totalB);
 
   const aName = (document.getElementById("userA").value || "A").trim() || "A";
   const bName = (document.getElementById("userB").value || "B").trim() || "B";
@@ -1194,47 +1201,52 @@ function startStarAnimation(){
 
   const emptyCounts = new Array(STAR_BINS.length).fill(0);
 
-  if (!total){
+  if (!totalSteps){
     status.textContent = "Need ratings from at least one user.";
-    summary.textContent = "";
+    summary.textContent = "Oldest → Newest";
     updateStarBars(emptyCounts, emptyCounts);
-    if (stepLabel) stepLabel.textContent = "";
+    if (progAEl) progAEl.textContent = "";
+    if (progBEl) progBEl.textContent = "";
     return;
   }
 
-  status.textContent = "";
-  summary.textContent = `${total} ratings (oldest → newest)`;
+  status.textContent  = "";
+  summary.textContent = "Oldest → Newest";
+
+  if (progAEl) progAEl.textContent = `0/${totalA}`;
+  if (progBEl) progBEl.textContent = `0/${totalB}`;
 
   const countsA = new Array(STAR_BINS.length).fill(0);
   const countsB = new Array(STAR_BINS.length).fill(0);
-  let i = 0;
-  const stepSize = 1; // exactly one rating per tick
+  let i = 0;                      // global step index
+  const stepDelay = 160;          // ms between frames; increase for slower
 
   // initial empty frame
   updateStarBars(emptyCounts, emptyCounts);
-  if (stepLabel) stepLabel.textContent = `Step 0 / ${total}`;
 
   function tick(){
-    if (i < total){
-      if (i < seqA.length){
+    if (i < totalSteps){
+      if (i < totalA){
         const idxA = ratingToBinIndex(seqA[i]);
         if (idxA >= 0) countsA[idxA]++;
       }
-      if (i < seqB.length){
+      if (i < totalB){
         const idxB = ratingToBinIndex(seqB[i]);
         if (idxB >= 0) countsB[idxB]++;
       }
-      i += stepSize;
+      i += 1;
+
       updateStarBars(countsA, countsB);
-      if (stepLabel) stepLabel.textContent = `Step ${i} / ${total}`;
+      if (progAEl) progAEl.textContent = `${Math.min(i, totalA)}/${totalA}`;
+      if (progBEl) progBEl.textContent = `${Math.min(i, totalB)}/${totalB}`;
     }
-    if (i >= total){
+    if (i >= totalSteps){
       clearInterval(starAnimTimer);
       starAnimTimer = null;
     }
   }
 
-  starAnimTimer = setInterval(tick, 160); // tweak 80 for slower/faster
+  starAnimTimer = setInterval(tick, stepDelay);
 
   const replayBtn = document.getElementById("starReplay");
   if (replayBtn && !replayBtn._bound){
