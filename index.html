@@ -1186,7 +1186,7 @@ function startStarAnimation(){
 
   const totalA = seqA.length;
   const totalB = seqB.length;
-  const totalSteps = Math.max(totalA, totalB);
+  const totalFrames = Math.max(totalA, totalB);   // both finish together
 
   const aName = (document.getElementById("userA").value || "A").trim() || "A";
   const bName = (document.getElementById("userB").value || "B").trim() || "B";
@@ -1201,8 +1201,8 @@ function startStarAnimation(){
 
   const emptyCounts = new Array(STAR_BINS.length).fill(0);
 
-  if (!totalSteps){
-    status.textContent = "Need ratings from at least one user.";
+  if (!totalFrames){
+    status.textContent  = "Need ratings from at least one user.";
     summary.textContent = "Oldest → Newest";
     updateStarBars(emptyCounts, emptyCounts);
     if (progAEl) progAEl.textContent = "";
@@ -1218,29 +1218,64 @@ function startStarAnimation(){
 
   const countsA = new Array(STAR_BINS.length).fill(0);
   const countsB = new Array(STAR_BINS.length).fill(0);
-  let i = 0;                      // global step index
-  const stepDelay = 160;          // ms between frames; increase for slower
+
+  // per-user progress
+  let frame = 0;
+  let idxA = 0, idxB = 0;
+  let accA = 0, accB = 0;
+
+  // smaller n → smaller step → slower rate
+  const stepA = totalA ? totalA / totalFrames : 0;
+  const stepB = totalB ? totalB / totalFrames : 0;
+
+  const stepDelay = 160;          // ms between frames
 
   // initial empty frame
   updateStarBars(emptyCounts, emptyCounts);
 
   function tick(){
-    if (i < totalSteps){
-      if (i < totalA){
-        const idxA = ratingToBinIndex(seqA[i]);
-        if (idxA >= 0) countsA[idxA]++;
+    if (frame < totalFrames){
+      // accumulate fractional progress
+      accA += stepA;
+      accB += stepB;
+
+      // add at most 1 rating per user per frame
+      if (idxA < totalA && accA >= 1){
+        accA -= 1;
+        const binA = ratingToBinIndex(seqA[idxA]);
+        if (binA >= 0) countsA[binA]++;
+        idxA++;
       }
-      if (i < totalB){
-        const idxB = ratingToBinIndex(seqB[i]);
-        if (idxB >= 0) countsB[idxB]++;
+      if (idxB < totalB && accB >= 1){
+        accB -= 1;
+        const binB = ratingToBinIndex(seqB[idxB]);
+        if (binB >= 0) countsB[binB]++;
+        idxB++;
       }
-      i += 1;
 
       updateStarBars(countsA, countsB);
-      if (progAEl) progAEl.textContent = `${Math.min(i, totalA)}/${totalA}`;
-      if (progBEl) progBEl.textContent = `${Math.min(i, totalB)}/${totalB}`;
+      if (progAEl) progAEl.textContent = `${idxA}/${totalA}`;
+      if (progBEl) progBEl.textContent = `${idxB}/${totalB}`;
+
+      frame++;
     }
-    if (i >= totalSteps){
+
+    if (frame >= totalFrames){
+      // safety: make sure any leftover ratings (from rounding) are added
+      while (idxA < totalA){
+        const binA = ratingToBinIndex(seqA[idxA]);
+        if (binA >= 0) countsA[binA]++;
+        idxA++;
+      }
+      while (idxB < totalB){
+        const binB = ratingToBinIndex(seqB[idxB]);
+        if (binB >= 0) countsB[binB]++;
+        idxB++;
+      }
+      updateStarBars(countsA, countsB);
+      if (progAEl) progAEl.textContent = `${totalA}/${totalA}`;
+      if (progBEl) progBEl.textContent = `${totalB}/${totalB}`;
+
       clearInterval(starAnimTimer);
       starAnimTimer = null;
     }
@@ -1250,6 +1285,7 @@ function startStarAnimation(){
 
   const replayBtn = document.getElementById("starReplay");
   if (replayBtn && !replayBtn._bound){
+    replayBtn._bound = true;
     replayBtn._bound = true;
     replayBtn.addEventListener("click", () => {
       startStarAnimation();
