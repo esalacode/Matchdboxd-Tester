@@ -1215,8 +1215,8 @@ function startStarAnimation(){
 
   const fmt = n => n.toLocaleString("en-US");
 
-  if (progAEl) progAEl.textContent = `${fmt(0)} / ${fmt(totalA)}`;
-  if (progBEl) progBEl.textContent = `${fmt(0)} / ${fmt(totalB)}`;
+  if (progAEl) progAEl.textContent = `${fmt(0)}/${fmt(totalA)}`;
+  if (progBEl) progBEl.textContent = `${fmt(0)}/${fmt(totalB)}`;
 
   const countsA = new Array(STAR_BINS.length).fill(0);
   const countsB = new Array(STAR_BINS.length).fill(0);
@@ -1256,8 +1256,8 @@ function startStarAnimation(){
       }
 
       updateStarBars(countsA, countsB);
-      if (progAEl) progAEl.textContent = `${fmt(idxA)} / ${fmt(totalA)}`;
-      if (progBEl) progBEl.textContent = `${fmt(idxB)} / ${fmt(totalB)}`;
+      if (progAEl) progAEl.textContent = `${fmt(idxA)}/${fmt(totalA)}`;
+      if (progBEl) progBEl.textContent = `${fmt(idxB)}/${fmt(totalB)}`;
 
       frame++;
     }
@@ -1275,8 +1275,8 @@ function startStarAnimation(){
         idxB++;
       }
       updateStarBars(countsA, countsB);
-      if (progAEl) progAEl.textContent = `${fmt(totalA)} / ${fmt(totalA)}`;
-      if (progBEl) progBEl.textContent = `${fmt(totalB)} / ${fmt(totalB)}`;
+      if (progAEl) progAEl.textContent = `${fmt(totalA)}/${fmt(totalA)}`;
+      if (progBEl) progBEl.textContent = `${fmt(totalB)}/${fmt(totalB)}`;
 
       clearInterval(starAnimTimer);
       starAnimTimer = null;
