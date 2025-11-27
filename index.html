@@ -154,19 +154,37 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
 /* Ratings animation panel */
 #panelS { position:relative; }
 #starAnimWrap { margin-top:4px; }
-.star-row{
+
+/* per-user block */
+.star-user{
+  margin-top:10px;
+}
+.star-user:first-of-type{
+  margin-top:4px;
+}
+
+/* header row: username (left) + count (right) */
+.star-header{
   display:flex;
-  align-items:flex-end;
+  align-items:baseline;
+  justify-content:space-between;
   gap:8px;
-  margin-top:8px;
 }
 .star-user-label{
-  width:72px;
   font-size:12px;
   color:var(--muted);
 }
+
+/* the “245/245” style text */
+.star-progress{
+  font-size:12px;
+  color:var(--muted);
+  margin-top:2px;
+}
+
+/* histogram bars */
 .star-bars{
-  flex:1;
+  margin-top:4px;
   display:flex;
   align-items:flex-end;
   gap:4px;
@@ -179,23 +197,21 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
   min-height:3%;
   transition:height .12s ease-out;
 }
-.star-progress{
-  margin-top:4px;
-}
+
 #starReplay{
   margin-top:8px;
   padding:6px 14px;
   border-radius:9999px;
   border:1px solid var(--grid);
   background:#1f2933;
-  color:var(--fg);
+  color:#ffffff;
   font-size:12px;
   cursor:pointer;
 }
 #starReplay:hover{
   background:#253341;
 }
-  
+
 </style>
 </head>
 <body>
@@ -222,21 +238,28 @@ header { display:flex; flex-direction: column; align-items:center; gap:12px; tex
   </div>
   <div id="statusS" class="status"></div>
   <div id="starAnimWrap">
-    <div class="star-row">
-      <div class="star-user-label" id="starUserA">User A</div>
+    <!-- User A -->
+    <div class="star-user">
+      <div class="star-header">
+        <div class="star-user-label" id="starUserA">User A</div>
+        <div class="small star-progress" id="starProgressA"></div>
+      </div>
       <div class="star-bars" id="starBarsA"></div>
     </div>
-    <div class="small star-progress" id="starProgressA"></div>
 
-    <div class="star-row">
-      <div class="star-user-label" id="starUserB">User B</div>
+    <!-- User B -->
+    <div class="star-user">
+      <div class="star-header">
+        <div class="star-user-label" id="starUserB">User B</div>
+        <div class="small star-progress" id="starProgressB"></div>
+      </div>
       <div class="star-bars" id="starBarsB"></div>
     </div>
-    <div class="small star-progress" id="starProgressB"></div>
 
     <button id="starReplay" type="button">Replay</button>
   </div>
 </section>
+
 
 <!-- By Year panel -->
 <section class="card" id="panelY">
